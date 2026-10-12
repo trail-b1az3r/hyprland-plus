@@ -1,6 +1,6 @@
 <div align = center>
 
-<img src="assets/hyprland-plus-logo.svg" width="220" height="220" alt="hyprland-plus logo: a gold plus with a glint and two sparkles">
+<img src="assets/hyprland-plus-logo.svg" width="600" alt="hyprland-plus logo: the Hyprland logo with a small gold plus at its upper right">
 
 # hyprland-plus
 
@@ -108,7 +108,8 @@ are unchanged, so existing configs and session files keep working.
 
 ## Logo
 
-`assets/hyprland-plus-logo.svg` is the logo at the top of this page: a gold plus with a glint and two sparkles.
+`assets/hyprland-plus-logo.svg` is the logo at the top of this page: the Hyprland logo (from `assets/header.svg`) with
+a small gold plus above and to the right of the wordmark.
 
 ## Status
 
