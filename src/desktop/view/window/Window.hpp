@@ -256,6 +256,12 @@ namespace Desktop::View {
         bool isMini() const {
             return m_mini;
         }
+        void setMini(bool mini) {
+            m_mini = mini;
+        }
+        CBox& miniRestoreBox() {
+            return m_miniRestoreBox;
+        }
 
         CBox getWindowMainSurfaceBox() const {
             return geometricBox(GEOMETRIC_CURRENT);

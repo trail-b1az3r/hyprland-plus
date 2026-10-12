@@ -314,7 +314,7 @@ ActionResult Actions::miniWindow(eTogglableAction action, std::optional<PHLWINDO
         if (!window->isFloating())
             g_layoutManager->changeFloatingMode(LAYOUTTARGET);
 
-        window->m_miniRestoreBox = LAYOUTTARGET->position();
+        window->miniRestoreBox() = LAYOUTTARGET->position();
 
         // Keep the top-left corner where the window was, pulled back onto the monitor if the mini size would leave it.
         const CBox     MONBOX = PMONITOR->logicalBox();
@@ -323,11 +323,11 @@ ActionResult Actions::miniWindow(eTogglableAction action, std::optional<PHLWINDO
         const double   MAXX = std::max(MONBOX.x, MONBOX.x + MONBOX.width - SIZE.x);
         const double   MAXY = std::max(MONBOX.y, MONBOX.y + MONBOX.height - SIZE.y);
 
-        window->m_mini = true;
+        window->setMini(true);
         LAYOUTTARGET->setPositionGlobal(CBox{std::clamp(POS.x, MONBOX.x, MAXX), std::clamp(POS.y, MONBOX.y, MAXY), SIZE.x, SIZE.y});
     } else {
-        window->m_mini = false;
-        LAYOUTTARGET->setPositionGlobal(window->m_miniRestoreBox);
+        window->setMini(false);
+        LAYOUTTARGET->setPositionGlobal(window->miniRestoreBox());
     }
 
     LAYOUTTARGET->warpPositionSize();
