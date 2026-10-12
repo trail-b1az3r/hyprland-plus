@@ -42,6 +42,7 @@ namespace Config::Actions {
     ActionResult floatWindow(eTogglableAction action, std::optional<PHLWINDOW> window = std::nullopt /* Active */);
     ActionResult pseudoWindow(eTogglableAction action, std::optional<PHLWINDOW> window = std::nullopt /* Active */);
     ActionResult pinWindow(eTogglableAction action, std::optional<PHLWINDOW> window = std::nullopt /* Active */);
+    ActionResult miniWindow(eTogglableAction action, std::optional<PHLWINDOW> window = std::nullopt /* Active */);
     ActionResult fullscreenWindow(Fullscreen::eFullscreenMode mode, bool layoutAware, std::optional<PHLWINDOW> window = std::nullopt /* Active */);
     ActionResult fullscreenWindow(Fullscreen::eFullscreenMode internalMode, Fullscreen::eFullscreenMode clientMode, bool layoutAware,
                                   std::optional<PHLWINDOW> window = std::nullopt /* Active */);

@@ -249,7 +249,11 @@ namespace Desktop::View {
         SP<Layout::ITarget> layoutTarget();
         SP<Layout::ITarget> layoutTarget() const;
         bool                isFloating() const;
-        void                sendClose();
+        // A mini window is small and floating; clicking it without moving it restores its previous box.
+        bool                isMini() const {
+            return m_mini;
+        }
+        void sendClose();
         void                requestClientFullscreen(const SClientFullscreenRequest& request);
 
         CBox                getWindowMainSurfaceBox() const {
@@ -296,6 +300,10 @@ namespace Desktop::View {
         UP<CWindowSwallowController> m_swallowing;
         UP<CWindowFullscreenPolicy>  m_fullscreenPolicy;
         UP<IWindowBackend>           m_backend;
+
+        // Mini window state, see hl.dsp.window.mini: the box to return to when the window is restored.
+        bool m_mini           = false;
+        CBox m_miniRestoreBox = {};
         UP<CWindowMetadata>          m_metadata;
         UP<CWindowPresentation>      m_presentation;
         UP<CWindowEffectsController> m_effects;
