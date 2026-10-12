@@ -137,7 +137,7 @@ hl.bind("SUPER + ALT + Right", hl.dsp.window.resize_edge({ edge = "right", amoun
 - Other edges of the tile do not move, and the window stays tiled.
 - The dotfiles bind the four edges to `SUPER + ALT + arrow` (grow) and `SUPER + ALT + SHIFT + arrow` (shrink).
 - `hl.dsp.window.fit_plustile({ window? })` fits a plustile window to its neighbours: each edge is pushed outwards
-  a step at a time, until the tiles on that side can give no more. The dotfiles bind it to `SUPER + ALT + F`.
+  a step at a time, until the tiles on that side can give no more. The dotfiles bind it to `SUPER + CTRL + F`, because `SUPER + ALT + F` is upstream's fullscreen bind.
 
 Source: `plustile` in `src/desktop/rule/windowRule/`, `resizeEdge` in `src/config/shared/actions/ConfigActions.cpp`,
 and `hl.dsp.window.resize_edge` in `src/config/lua/bindings/LuaBindingsDispatchers.cpp`.
