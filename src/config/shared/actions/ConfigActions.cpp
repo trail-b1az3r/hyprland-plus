@@ -283,6 +283,61 @@ ActionResult Actions::pseudoWindow(eTogglableAction action, std::optional<PHLWIN
     return {};
 }
 
+ActionResult Actions::miniWindow(eTogglableAction action, std::optional<PHLWINDOW> w) {
+    auto window = xtract(w);
+    if (!window)
+        return {};
+
+    if (Fullscreen::controller()->isFullscreen(window))
+        return actionError("Window does not qualify to be a mini window", eActionErrorLevel::WARNING, eActionErrorCode::INVALID_STATE);
+
+    const bool MINI     = window->isMini();
+    bool       wantMini = false;
+    switch (action) {
+        case TOGGLE_ACTION_TOGGLE: wantMini = !MINI; break;
+        case TOGGLE_ACTION_ENABLE: wantMini = true; break;
+        case TOGGLE_ACTION_DISABLE: wantMini = false; break;
+    }
+
+    if (wantMini == MINI)
+        return {};
+
+    const auto LAYOUTTARGET = window->layoutTarget();
+    const auto PMONITOR     = window->m_monitor.lock();
+    if (!LAYOUTTARGET || !PMONITOR)
+        return actionError("Window has no layout target or monitor", eActionErrorLevel::WARNING, eActionErrorCode::INVALID_STATE);
+
+    if (wantMini) {
+        static auto PMINIWIDTH  = CConfigValue<Config::INTEGER>("binds:mini_width");
+        static auto PMINIHEIGHT = CConfigValue<Config::INTEGER>("binds:mini_height");
+
+        if (!window->isFloating())
+            g_layoutManager->changeFloatingMode(LAYOUTTARGET);
+
+        window->m_miniRestoreBox = LAYOUTTARGET->position();
+
+        // Keep the top-left corner where the window was, pulled back onto the monitor if the mini size would leave it.
+        const CBox     MONBOX = PMONITOR->logicalBox();
+        const Vector2D SIZE{sc<double>(*PMINIWIDTH), sc<double>(*PMINIHEIGHT)};
+        const auto     POS  = LAYOUTTARGET->position().pos();
+        const double   MAXX = std::max(MONBOX.x, MONBOX.x + MONBOX.width - SIZE.x);
+        const double   MAXY = std::max(MONBOX.y, MONBOX.y + MONBOX.height - SIZE.y);
+
+        window->m_mini = true;
+        LAYOUTTARGET->setPositionGlobal(CBox{std::clamp(POS.x, MONBOX.x, MAXX), std::clamp(POS.y, MONBOX.y, MAXY), SIZE.x, SIZE.y});
+    } else {
+        window->m_mini = false;
+        LAYOUTTARGET->setPositionGlobal(window->m_miniRestoreBox);
+    }
+
+    LAYOUTTARGET->warpPositionSize();
+
+    IPC::Socket2::sock()->postEvent({.event = "mini", .data = std::format("{:x},{}", rc<uintptr_t>(window.get()), sc<int>(wantMini))});
+    g_pHyprRenderer->damageWindow(window, true);
+
+    return {};
+}
+
 ActionResult Actions::pinWindow(eTogglableAction action, std::optional<PHLWINDOW> w) {
     auto window = xtract(w);
     if (!window)

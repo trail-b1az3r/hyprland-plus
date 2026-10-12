@@ -33,6 +33,70 @@ easy IPC, much more QoL stuff than other compositors and more...
 
 </div>
 
+# This fork (Halcyon)
+
+This is Hyprland 0.56.0 with a change to how a tiled window that is dragged becomes floating. Upstream
+centres the window on the cursor when it floats, so the window jumps. This happens with apps that draw
+their own top bar and ask Hyprland to move them, such as Firefox and Dolphin.
+
+## New option: `binds:drag_keep_grab_point`
+
+- Type: boolean, default `false`. Upstream behaviour is unchanged unless you turn it on.
+- When on, a tiled or fullscreen window that becomes floating while dragged keeps the exact pixel offset
+  between the cursor and the window, so the grab point does not move. If the offset is larger than the new
+  window, it is clamped to the window's edge.
+- It takes precedence over `binds:drag_center_window`.
+
+Lua (`hl.config`):
+
+```lua
+hl.config({ binds = { drag_keep_grab_point = true, drag_center_window = false } })
+```
+
+Hyprlang:
+
+```
+binds {
+    drag_keep_grab_point = true
+}
+```
+
+Source: `src/config/values/ConfigValues.cpp` (option declaration) and
+`src/layout/supplementary/DragController.cpp` (`updateDragWindow`, `MAPDRAGHOTSPOT`).
+
+## Mini windows: `hl.dsp.window.mini`
+
+A mini window is a very small floating window. It can be moved anywhere on the screen, so it can be fitted
+around other windows, and it stays small while it is moved. A press and release on it without moving it
+brings it back to its full size.
+
+- `hl.dsp.window.mini({ action = "toggle" | "enable" | "disable", window = "address:..." })`. With no table,
+  it toggles the active window. Mini windows are floating; a tiled window becomes floating first.
+- Size: `binds:mini_width` and `binds:mini_height` (pixels, default 96 x 54).
+- The top-left corner stays where the window was, pulled back onto the monitor if the mini size would leave
+  it. Restoring puts the window back at its previous place and size and it stays floating.
+- Moving a mini window uses the normal move paths: SUPER + drag, or any move dispatch. The existing
+  `general:snap:enabled` setting also snaps mini windows to the edges and to other windows while they are dragged.
+- `hyprctl clients -j` now has a `"mini"` boolean for each window. A `mini` socket2 event is sent with
+  `address,state` when a window changes.
+
+Lua:
+
+```lua
+hl.config({ binds = { mini_width = 96, mini_height = 54 } })
+hl.bind("SUPER + CTRL + N", hl.dsp.window.mini(), { description = "Window: Make mini, or bring back to full size" })
+```
+
+Source: `miniWindow` in `src/config/shared/actions/ConfigActions.cpp`, the click handling in
+`processMouseDownNormal` (`src/managers/input/InputManager.cpp`), `isMini` and `m_mini` in
+`src/desktop/view/window/Window.hpp`, and the Lua binding in `src/config/lua/bindings/LuaBindingsDispatchers.cpp`.
+
+### Status
+
+Not built or run yet. In the session where this was written, the build dependencies (hyprutils, aquamarine,
+hyprlang, hyprgraphics, hyprcursor, wayland-server, libinput) were not installed, so the files were not
+compiled. Build it and test a drag and a click on a mini window before relying on it.
+
 # Features
 
 - All of the eyecandy: gradient borders, many types of blur, animations, glow, shadows and much more

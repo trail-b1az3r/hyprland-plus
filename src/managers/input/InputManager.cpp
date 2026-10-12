@@ -853,6 +853,26 @@ void CInputManager::processMouseDownNormal(const IPointer::SButtonEvent& e, SP<I
     const auto mouseCoords = g_pInputManager->getMouseCoordsInternal();
     const auto w           = Desktop::viewState()->hitTest().windowAt(mouseCoords, Desktop::View::ALLOW_FLOATING | Desktop::View::RESERVED_EXTENTS | Desktop::View::INPUT_EXTENTS);
 
+    // A mini window: a press and release without moving it restores the window to its full size. Neither
+    // event reaches the app, so a tap on a mini window does not also click inside it.
+    static WP<Desktop::View::CWindow> miniPressed;
+    static Vector2D                   miniPressedAt;
+    static constexpr double           MINI_CLICK_SLOP = 6.0;
+
+    if (e.state == WL_POINTER_BUTTON_STATE_RELEASED && !miniPressed.expired()) {
+        const auto PRESSED = miniPressed.lock();
+        miniPressed        = {};
+        if (PRESSED && PRESSED == w && (mouseCoords - miniPressedAt).size() <= MINI_CLICK_SLOP)
+            Config::Actions::miniWindow(Config::Actions::TOGGLE_ACTION_DISABLE, PRESSED);
+        return;
+    }
+
+    if (w && w->isMini() && e.state == WL_POINTER_BUTTON_STATE_PRESSED) {
+        miniPressed   = w;
+        miniPressedAt = mouseCoords;
+        return;
+    }
+
     if (w && !m_lastFocusOnLS && !g_pSessionLockManager->isSessionLocked() && w->presentation().checkInputOnDecorations(INPUT_TYPE_BUTTON, mouseCoords, e))
         return;
 

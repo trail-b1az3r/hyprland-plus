@@ -980,6 +980,19 @@ static int hlWindowPin(lua_State* L) {
     return 1;
 }
 
+static int dsp_miniWindow(lua_State* L) {
+    return Internal::checkResult(L, CA::miniWindow(sc<CA::eTogglableAction>((int)lua_tonumber(L, lua_upvalueindex(1))), Internal::windowFromUpval(L, 2)));
+}
+
+static int hlWindowMini(lua_State* L) {
+    const auto action = Internal::tableToggleAction(L, 1);
+
+    lua_pushnumber(L, (int)action);
+    Internal::pushWindowUpval(L, 1);
+    lua_pushcclosure(L, dsp_miniWindow, 2);
+    return 1;
+}
+
 static int hlWindowBringToTop(lua_State* L) {
     lua_pushcclosure(L, dsp_bringToTop, 0);
     return 1;
@@ -1325,6 +1338,7 @@ void Internal::registerDispatcherBindings(lua_State* L) {
         Internal::setDispatcherFn(L, "clear_tags", hlWindowClearTags, 1);
         Internal::setDispatcherFn(L, "toggle_swallow", hlWindowToggleSwallow, 0);
         Internal::setDispatcherFn(L, "pin", hlWindowPin, 1);
+        Internal::setDispatcherFn(L, "mini", hlWindowMini, 1);
         Internal::setDispatcherFn(L, "bring_to_top", hlWindowBringToTop, 0);
         Internal::setDispatcherFn(L, "alter_zorder", hlWindowAlterZOrder, 1);
         Internal::setDispatcherFn(L, "set_prop", hlWindowSetProp, 1);

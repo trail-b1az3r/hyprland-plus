@@ -88,6 +88,7 @@ bool CDragStateController::updateDragWindow() {
     const auto  DRAGGINGTARGET = m_target.lock();
     const bool  WAS_FULLSCREEN = DRAGGINGTARGET->window() ? Fullscreen::controller()->isFullscreen(DRAGGINGTARGET->window()) : false;
     static auto PDRAGCENTER    = CConfigValue<Config::BOOL>("binds:drag_center_window");
+    static auto PKEEPGRABPOINT = CConfigValue<Config::BOOL>("binds:drag_keep_grab_point");
 
     // geometry before we un-fullscreen / untile, needed to map the grab point onto the new window
     const CBox PRE_DRAG_BOX = DRAGGINGTARGET->position();
@@ -100,7 +101,11 @@ bool CDragStateController::updateDragWindow() {
         const auto NEWSIZE     = target->position().size();
         const auto OLDSIZE     = oldBox.size();
 
-        if (*PDRAGCENTER)
+        if (*PKEEPGRABPOINT) {
+            // the same pixel offset from the window's top-left as before the drag, kept inside the new box
+            // so the window never ends up with the cursor outside it
+            m_dragHotspot = (MOUSECOORDS - oldBox.pos()).clamp(Vector2D{0.F, 0.F}, NEWSIZE);
+        } else if (*PDRAGCENTER)
             m_dragHotspot = NEWSIZE / 2.F;
         else {
             const Vector2D REL = {OLDSIZE.x > 0 ? (MOUSECOORDS.x - oldBox.pos().x) / OLDSIZE.x : 0.5, OLDSIZE.y > 0 ? (MOUSECOORDS.y - oldBox.pos().y) / OLDSIZE.y : 0.5};
