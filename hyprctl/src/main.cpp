@@ -1,4 +1,5 @@
 #include <re2/re2.h>
+#include <array>
 #include <string_view>
 
 #include <cctype>
@@ -400,10 +401,137 @@ static std::string shellQuote(const std::string& s) {
     return out + "'";
 }
 
+// The dotfile sets `hyprctl dots <set> --install` can install. Each one is cloned as it is upstream and nothing in the
+// clone is edited. The entries it provides are backed up to ~/.local/state/halcyon/backups, then its own installer runs.
+// Every set replaces the desktop's config in ~/.config, so `hyprctl dots plus --install` brings Halcyon back.
+struct SDotSet {
+    std::string_view name;  // the name hyprctl takes
+    std::string_view alias; // a second name, or ""
+    std::string_view title;
+    std::string_view url;        // the upstream repository, cloned shallow
+    std::string_view configDir;  // folder in the repository whose entries go to ~/.config
+    std::string_view binDir;     // folder in the repository whose entries go to ~/.local/bin, or ""
+    std::string_view install;    // shell command run after the backup, in the clone ($DIR)
+    bool             clearFirst; // remove the entries after backing them up, instead of copying over them
+    std::string_view note;
+};
+
+static const std::array<SDotSet, 3> DOT_SETS = {{
+    {
+        .name       = "jakoolit",
+        .alias      = "hyprland-dots",
+        .title      = "JaKooLit Hyprland-Dots",
+        .url        = "https://github.com/JaKooLit/Hyprland-Dots",
+        .configDir  = "config",
+        .binDir     = "",
+        .install    = "cd \"$DIR\" && chmod +x copy.sh && ./copy.sh",
+        .clearFirst = false,
+        .note       = "Its copy.sh asks questions in the terminal and makes its own backups. The repository says it was archived "
+                      "in March 2026 and is now maintained at https://github.com/LinuxBeginnings/Hyprland-Dots.",
+    },
+    {
+        .name       = "mlfw",
+        .alias      = "ml4w",
+        .title      = "ML4W OS (mylinuxforwork/dotfiles)",
+        .url        = "https://github.com/mylinuxforwork/dotfiles",
+        .configDir  = "dotfiles/.config",
+        .binDir     = "",
+        .install    = "curl -fsSL https://ml4w.com/os/stable -o \"$ROOT/ml4w-install.sh\" && bash \"$ROOT/ml4w-install.sh\"",
+        .clearFirst = false,
+        .note       = "The installer is ML4W's own, from ml4w.com as its docs say. It installs packages and asks questions in the "
+                      "terminal. To read it first: curl -fsSL https://ml4w.com/os/stable | less",
+    },
+    {
+        .name       = "gdots",
+        .alias      = "gdot",
+        .title      = "gdots (semi710/gdots)",
+        .url        = "https://github.com/semi710/gdots",
+        .configDir  = ".config",
+        .binDir     = "bin",
+        .install    = "mkdir -p \"$HOME/.config\" \"$HOME/.local/bin\" && cp -a \"$DIR/.config/.\" \"$HOME/.config/\" && "
+                      "cp -a \"$DIR/bin/.\" \"$HOME/.local/bin/\"",
+        .clearFirst = true,
+        .note       = "Copied rather than stowed, so Halcyon's installer never writes into the clone. It does not install the "
+                      "packages its README lists (pywal16, waybar, hyprlock and others).",
+    },
+}};
+
+// The shell script `hyprctl dots <set> --install` runs: fetch or update the clone, back up what the set would replace,
+// optionally clear it, then run the set's install.
+static std::string dotSetScript(const SDotSet& set) {
+    const std::string NAME = std::string(set.name);
+    std::string       s;
+    s += "set -e\n";
+    s += "ROOT=\"$HOME/.local/share/halcyon/dotsets\"\n";
+    s += "DIR=\"$ROOT/" + NAME + "\"\n";
+    s += "STATE=\"${XDG_STATE_HOME:-$HOME/.local/state}/halcyon\"\n";
+    s += "command -v git >/dev/null 2>&1 || { echo 'git is needed to fetch the dotfiles. Install it, then run this again.'; exit 1; }\n";
+    s += "mkdir -p \"$ROOT\"\n";
+    s += "if [ -d \"$DIR/.git\" ]; then git -C \"$DIR\" pull --ff-only; else git clone --depth 1 " + shellQuote(std::string(set.url)) + " \"$DIR\"; fi\n";
+    s += "BK=\"$STATE/backups/" + NAME + "-$(date +%Y%m%d-%H%M%S)\"\n";
+    s += "mkdir -p \"$BK/config\" \"$BK/bin\"\n";
+    s += "entries() { find \"$1\" -mindepth 1 -maxdepth 1 -printf '%f\\n'; }\n";
+    s += "entries \"$DIR/" + std::string(set.configDir) +
+        "\" | while IFS= read -r n; do "
+        "if [ -e \"$HOME/.config/$n\" ] || [ -L \"$HOME/.config/$n\" ]; then cp -a \"$HOME/.config/$n\" \"$BK/config/\"; fi; done\n";
+    if (!set.binDir.empty()) {
+        s += "entries \"$DIR/" + std::string(set.binDir) +
+            "\" | while IFS= read -r n; do "
+            "if [ -e \"$HOME/.local/bin/$n\" ] || [ -L \"$HOME/.local/bin/$n\" ]; then cp -a \"$HOME/.local/bin/$n\" \"$BK/bin/\"; fi; done\n";
+    }
+    if (set.clearFirst) {
+        s += "entries \"$DIR/" + std::string(set.configDir) + "\" | while IFS= read -r n; do rm -rf \"$HOME/.config/$n\"; done\n";
+        if (!set.binDir.empty())
+            s += "entries \"$DIR/" + std::string(set.binDir) + "\" | while IFS= read -r n; do rm -rf \"$HOME/.local/bin/$n\"; done\n";
+    }
+    s += std::string(set.install) + "\n";
+    s += "echo\n";
+    s += "echo \"Installed " + std::string(set.title) + ". Your previous settings are in $BK\"\n";
+    s += "echo \"To go back to Halcyon, run: hyprctl dots plus --install\"\n";
+    return s;
+}
+
+static int dotsUsage() {
+    std::println("usage: hyprctl dots [plus | jakoolit | mlfw | gdots] [--install]");
+    std::println("  hyprctl dots                 list the sets");
+    std::println("  hyprctl dots <set>           describe what installing it would do");
+    std::println("  hyprctl dots <set> --install clone it, back up the config it replaces, and install it (run in a terminal)");
+    return 1;
+}
+
+static int dotsList() {
+    std::println("hyprctl dots plus [--install]     Halcyon, from its dots checkout (hyprland-plus is already installed)");
+    for (const auto& set : DOT_SETS)
+        std::println("hyprctl dots {} [--install]{}{}", set.name, std::string(set.name).size() < 9 ? "     " : "  ", set.title);
+    return 0;
+}
+
+static int describeDotSet(const SDotSet& set) {
+    std::println("{}", set.title);
+    std::println("  from:     {}", set.url);
+    std::println("  clone:    ~/.local/share/halcyon/dotsets/{} (not edited)", set.name);
+    std::println("  backup:   the entries it provides, to ~/.local/state/halcyon/backups/{}-<time>", set.name);
+    std::println("  install:  {}", set.install);
+    std::println("  {}", set.note);
+    std::println("This replaces the Halcyon config in ~/.config. \"hyprctl dots plus --install\" brings Halcyon back.");
+    std::println("Run \"hyprctl dots {} --install\" in a terminal to install it.", set.name);
+    return 0;
+}
+
+static int runDotSet(const SDotSet& set, bool install) {
+    if (!install)
+        return describeDotSet(set);
+
+    const std::string SCRIPT = dotSetScript(set);
+    execl("/bin/sh", "sh", "-c", SCRIPT.c_str(), static_cast<char*>(nullptr));
+    std::println("could not start the install: {}", std::strerror(errno));
+    return 1;
+}
+
 // hyprctl dots plus [--install]: the Halcyon dots, from the checkout the dots installer recorded in
 // ~/.local/state/halcyon/repo. "plus" means hyprland-plus is already installed, so the dots installer
 // does not build it again. --install runs the dots installer non-interactively (setup install --force).
-static int runDotsCommand(int argc, char** argv) {
+static int runPlus(int argc) {
     const char*       XDG_STATE  = std::getenv("XDG_STATE_HOME");
     const char*       HOME_DIR   = std::getenv("HOME");
     const std::string STATE_HOME = XDG_STATE ? std::string(XDG_STATE) : std::string(HOME_DIR ? HOME_DIR : "") + "/.local/state";
@@ -416,26 +544,37 @@ static int runDotsCommand(int argc, char** argv) {
         return 1;
     }
 
-    const std::string_view MODE = argc >= 3 ? std::string_view{argv[2]} : std::string_view{};
-    if (MODE != "plus") {
-        std::println("usage: hyprctl dots plus [--install]");
-        return 1;
-    }
-
     if (argc == 3) {
         std::println("hyprland-plus is installed. Halcyon dots checkout: {}", repo);
         return 0;
     }
 
-    if (argc == 4 && std::string_view{argv[3]} == "--install") {
-        const std::string CMD = "cd " + shellQuote(repo) + " && HALCYON_SKIP_HYPRLAND_PLUS=1 ./setup install --force";
-        execl("/bin/sh", "sh", "-c", CMD.c_str(), static_cast<char*>(nullptr));
-        std::println("could not start the dots installer: {}", std::strerror(errno));
-        return 1;
+    const std::string CMD = "cd " + shellQuote(repo) + " && HALCYON_SKIP_HYPRLAND_PLUS=1 ./setup install --force";
+    execl("/bin/sh", "sh", "-c", CMD.c_str(), static_cast<char*>(nullptr));
+    std::println("could not start the dots installer: {}", std::strerror(errno));
+    return 1;
+}
+
+// hyprctl dots [plus | <set>] [--install]: see dotsUsage().
+static int runDotsCommand(int argc, char** argv) {
+    const std::string_view NAME    = argc >= 3 ? std::string_view{argv[2]} : std::string_view{};
+    const bool             INSTALL = argc == 4 && std::string_view{argv[3]} == "--install";
+    if (argc > 4 || (argc == 4 && !INSTALL))
+        return dotsUsage();
+
+    if (NAME.empty())
+        return dotsList();
+
+    if (NAME == "plus")
+        return runPlus(argc);
+
+    for (const auto& set : DOT_SETS) {
+        if (NAME == set.name || (!set.alias.empty() && NAME == set.alias))
+            return runDotSet(set, INSTALL);
     }
 
-    std::println("usage: hyprctl dots plus [--install]");
-    return 1;
+    std::println("unknown dots set: {}", NAME);
+    return dotsUsage();
 }
 
 int main(int argc, char** argv) {
