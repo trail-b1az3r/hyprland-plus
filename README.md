@@ -13,7 +13,7 @@ Hyprland 0.56.2, with the Halcyon changes described below.
 ![Badge Language] 
 [![Badge Pull Requests]][Pull Requests] 
 [![Badge Issues]][Issues] 
-![Badge Hi Mom]<br>
+![Badge Hi Sister]<br>
 
 <br>
 
@@ -36,6 +36,24 @@ easy IPC, much more QoL stuff than other compositors and more...
 <br>
 
 </div>
+
+# Install
+
+hyprland-plus is built from this repository. On Arch, one command gets a helper that installs or updates it:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/trail-b1az3r/dots/claude/youthful-gates-rt1csq-v2/tools/hyprctl-lite/hyprctl-lite | sudo tee /usr/local/bin/hyprctl-lite >/dev/null && sudo chmod 755 /usr/local/bin/hyprctl-lite
+sudo hyprctl-lite install full
+```
+
+`hyprctl-lite install full` clones hyprland-plus into `~/hyprland-plus` (or updates it), builds it as your user, and
+installs it to `/usr/local`. It removes itself when it's done. The packaged Hyprland is kept as
+`/usr/bin/hyprland.official`. The `curl` command runs a script from GitHub as root, so read it first if you prefer.
+
+Other distributions: build it by hand with the same steps. The AUR package is described in `packaging/aur/`.
+
+For Hyprland's own documentation, see the [configuration guide](https://wiki.hypr.land/Configuring/). It applies here,
+because this is Hyprland 0.56.2 with additions.
 
 # What this fork adds
 
@@ -229,17 +247,17 @@ code, are in [CREDITS.md](CREDITS.md).
 <!----------------------------------------------------------------------------->
 
 [Configure]: https://wiki.hypr.land/Configuring/
-[Stars]: https://starchart.cc/hyprwm/Hyprland
+[Stars]: https://starchart.cc/trail-b1az3r/hyprland-plus
 [Hypr]: https://github.com/hyprwm/Hypr
 
-[Pull Requests]: https://github.com/hyprwm/Hyprland/pulls
-[Issues]: https://github.com/hyprwm/Hyprland/issues
-[Todo]: https://github.com/hyprwm/Hyprland/projects?type=beta
+[Pull Requests]: https://github.com/trail-b1az3r/hyprland-plus/pulls
+[Issues]: https://github.com/trail-b1az3r/hyprland-plus/issues
+[Todo]: https://github.com/trail-b1az3r/hyprland-plus/projects
 
 [Contribute]: https://wiki.hypr.land/Contributing-and-Debugging/
-[Install]: https://wiki.hypr.land/Getting-Started/Installation/
+[Install]: #install
 [Quick Start]: https://wiki.hypr.land/Getting-Started/Master-Tutorial/
-[Workflow]: https://github.com/hyprwm/Hyprland/actions/workflows/ci.yaml
+[Workflow]: https://github.com/trail-b1az3r/hyprland-plus/actions/workflows/ci.yaml
 [License]: LICENSE
 
 
@@ -261,11 +279,11 @@ code, are in [CREDITS.md](CREDITS.md).
 
 <!----------------------------------{ Badges }--------------------------------->
 
-[Badge Workflow]: https://github.com/hyprwm/Hyprland/actions/workflows/ci.yaml/badge.svg
+[Badge Workflow]: https://github.com/trail-b1az3r/hyprland-plus/actions/workflows/ci.yaml/badge.svg
 
-[Badge Issues]: https://img.shields.io/github/issues/hyprwm/Hyprland
-[Badge Pull Requests]: https://img.shields.io/github/issues-pr/hyprwm/Hyprland
-[Badge Language]: https://img.shields.io/github/languages/top/hyprwm/Hyprland
-[Badge License]: https://img.shields.io/github/license/hyprwm/Hyprland
-[Badge Lines]: https://img.shields.io/tokei/lines/github/hyprwm/Hyprland
-[Badge Hi Mom]: https://img.shields.io/badge/Hi-mom!-ff69b4
+[Badge Issues]: https://img.shields.io/github/issues/trail-b1az3r/hyprland-plus
+[Badge Pull Requests]: https://img.shields.io/github/issues-pr/trail-b1az3r/hyprland-plus
+[Badge Language]: https://img.shields.io/github/languages/top/trail-b1az3r/hyprland-plus
+[Badge License]: https://img.shields.io/github/license/trail-b1az3r/hyprland-plus
+[Badge Lines]: https://img.shields.io/tokei/lines/github/trail-b1az3r/hyprland-plus
+[Badge Hi Sister]: https://img.shields.io/badge/Hi-sister!-ff69b4
