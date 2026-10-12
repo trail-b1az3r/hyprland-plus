@@ -1,4 +1,5 @@
 #include <re2/re2.h>
+#include <string_view>
 
 #include <cctype>
 #include <cerrno>
@@ -387,6 +388,56 @@ std::vector<std::string> splitArgs(int argc, char** argv) {
     return result;
 }
 
+// Single-quotes a string for sh.
+static std::string shellQuote(const std::string& s) {
+    std::string out = "'";
+    for (const char c : s) {
+        if (c == '\'')
+            out += "'\\''";
+        else
+            out += c;
+    }
+    return out + "'";
+}
+
+// hyprctl dots plus [--install]: the Halcyon dots, from the checkout the dots installer recorded in
+// ~/.local/state/halcyon/repo. "plus" means hyprland-plus is already installed, so the dots installer
+// does not build it again. --install runs the dots installer non-interactively (setup install --force).
+static int runDotsCommand(int argc, char** argv) {
+    const char*       XDG_STATE  = std::getenv("XDG_STATE_HOME");
+    const char*       HOME_DIR   = std::getenv("HOME");
+    const std::string STATE_HOME = XDG_STATE ? std::string(XDG_STATE) : std::string(HOME_DIR ? HOME_DIR : "") + "/.local/state";
+    const std::string REPO_FILE  = STATE_HOME + "/halcyon/repo";
+
+    std::ifstream     repoStream(REPO_FILE);
+    std::string       repo;
+    if (!repoStream || !std::getline(repoStream, repo) || repo.empty()) {
+        std::println("The Halcyon dots are not set up yet. Run ./setup install in the dots repository first.");
+        return 1;
+    }
+
+    const std::string_view MODE = argc >= 3 ? std::string_view{argv[2]} : std::string_view{};
+    if (MODE != "plus") {
+        std::println("usage: hyprctl dots plus [--install]");
+        return 1;
+    }
+
+    if (argc == 3) {
+        std::println("hyprland-plus is installed. Halcyon dots checkout: {}", repo);
+        return 0;
+    }
+
+    if (argc == 4 && std::string_view{argv[3]} == "--install") {
+        const std::string CMD = "cd " + shellQuote(repo) + " && HALCYON_SKIP_HYPRLAND_PLUS=1 ./setup install --force";
+        execl("/bin/sh", "sh", "-c", CMD.c_str(), static_cast<char*>(nullptr));
+        std::println("could not start the dots installer: {}", std::strerror(errno));
+        return 1;
+    }
+
+    std::println("usage: hyprctl dots plus [--install]");
+    return 1;
+}
+
 int main(int argc, char** argv) {
     bool parseArgs = true;
 
@@ -394,6 +445,9 @@ int main(int argc, char** argv) {
         std::println("{}", USAGE);
         return 1;
     }
+
+    if (std::string_view{argv[1]} == "dots")
+        return runDotsCommand(argc, argv);
 
     std::string fullRequest      = "";
     std::string fullArgs         = "";
