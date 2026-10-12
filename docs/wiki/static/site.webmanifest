@@ -1,0 +1,32 @@
+{
+    "name": "Hyprland Wiki",
+    "short_name": "HyprWiki",
+    "description": "The official wiki for the Hyprland window manager",
+    "start_url": "/",
+    "dir": "auto",
+    "lang": "en-US",
+    "theme_color": "#111111",
+    "background_color": "#111111",
+    "display": "standalone",
+    "orientation": "any",
+    "icons": [
+        {
+            "src": "/favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any"
+        },
+        {
+            "src": "/android-chrome-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/android-chrome-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        }
+    ]
+}
