@@ -40,12 +40,8 @@ eViewType View::CSessionLock::type() const {
     return VIEW_TYPE_LOCK_SCREEN;
 }
 
-bool View::CSessionLock::mapped() const {
+bool View::CSessionLock::visible() const {
     return m_wlSurface && m_wlSurface->resource() && m_wlSurface->resource()->m_mapped;
-}
-
-bool View::CSessionLock::focusAvailable() const {
-    return true;
 }
 
 std::optional<CBox> View::CSessionLock::logicalBox() const {
@@ -53,7 +49,7 @@ std::optional<CBox> View::CSessionLock::logicalBox() const {
 }
 
 std::optional<CBox> View::CSessionLock::surfaceLogicalBox() const {
-    if (!mapped() || !acceptsInput())
+    if (!visible())
         return std::nullopt;
 
     const auto BOX = geometricBox(GEOMETRIC_CURRENT);
@@ -92,8 +88,4 @@ PHLMONITOR View::CSessionLock::monitor() const {
     if (m_surface)
         return m_surface->monitor();
     return nullptr;
-}
-
-bool View::CSessionLock::cantLockCursor() const {
-    return false;
 }

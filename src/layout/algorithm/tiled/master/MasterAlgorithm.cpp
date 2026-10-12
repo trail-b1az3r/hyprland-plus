@@ -1,6 +1,4 @@
 #include "MasterAlgorithm.hpp"
-#include "../../../../helpers/MiscFunctions.hpp"
-#include "../../../../desktop/view/window/WindowPresentation.hpp"
 
 #include "../../Algorithm.hpp"
 #include "../../../space/Space.hpp"
@@ -66,7 +64,7 @@ void CMasterAlgorithm::addTarget(SP<ITarget> target, bool firstMap) {
     }
 
     const bool BNEWBEFOREACTIVE = *PNEWONACTIVE == "before";
-    const bool BNEWISMASTER     = dragOntoMaster || (!DRAGMOVE && *PNEWSTATUS == "master");
+    const bool BNEWISMASTER     = dragOntoMaster || *PNEWSTATUS == "master";
 
     const auto PNODE = [&]() -> SP<SMasterNodeData> {
         if (*PNEWONACTIVE != "none" && !BNEWISMASTER) {
@@ -100,7 +98,7 @@ void CMasterAlgorithm::addTarget(SP<ITarget> target, bool firstMap) {
     if (*PDROPATCURSOR && DRAGMOVE) {
         if (CENTERED) {
             if (const auto PMASTER = getMasterNode(); PMASTER) {
-                const auto MBOX = CBox{PMASTER->position, PMASTER->size};
+                const CBox MBOX = PMASTER->pTarget->position();
                 if (MOUSECOORDS.x >= MBOX.x && MOUSECOORDS.x <= MBOX.x + MBOX.w)
                     forceDropAsMaster = true;
                 else {
@@ -118,7 +116,7 @@ void CMasterAlgorithm::addTarget(SP<ITarget> target, bool firstMap) {
                         if (nd->isMaster)
                             continue;
                         const bool ndRight = (slavesNo % 2 == 0) == FIRSTSIDERIGHT;
-                        if (ndRight == DROPRIGHT && MOUSECOORDS.y > CBox{nd->position, nd->size}.middle().y)
+                        if (ndRight == DROPRIGHT && MOUSECOORDS.y > nd->pTarget->position().middle().y)
                             ++slot;
                         ++slavesNo;
                     }
@@ -150,7 +148,7 @@ void CMasterAlgorithm::addTarget(SP<ITarget> target, bool firstMap) {
             const std::size_t srcIndex = sc<std::size_t>(std::distance(v.begin(), NODEIT));
 
             for (std::size_t i = 0; i < v.size(); ++i) {
-                const auto box = CBox{v[i]->position, v[i]->size};
+                const CBox box = v[i]->pTarget->position();
                 if (!box.containsPoint(MOUSECOORDS))
                     continue;
 
@@ -191,7 +189,7 @@ void CMasterAlgorithm::addTarget(SP<ITarget> target, bool firstMap) {
             // make it the master only if the cursor is on the master side of the screen
             for (auto const& nd : m_masterNodesData) {
                 if (nd->isMaster) {
-                    const auto MIDDLE = CBox{nd->position, nd->size}.middle();
+                    const auto MIDDLE = nd->pTarget->position().middle();
                     switch (orientation) {
                         case ORIENTATION_LEFT:
                         case ORIENTATION_CENTER:
@@ -488,13 +486,13 @@ void CMasterAlgorithm::moveTargetInDirection(SP<ITarget> t, Math::eDirection dir
     if (!targetWs)
         return;
 
-    t->window()->presentation().setAnimationsToMove();
+    t->window()->setAnimationsToMove();
 
     if (t->window()->m_workspace != targetWs) {
         if (!*PMONITORFALLBACK)
             return; // noop
 
-        t->assignToSpace(targetWs->space(), focalPointForDir(t, dir));
+        t->assignToSpace(targetWs->m_space, focalPointForDir(t, dir));
     } else if (PWINDOW2) {
         // if same monitor, switch windows
         g_layoutManager->switchTargets(t, PWINDOW2->layoutTarget());
@@ -537,7 +535,7 @@ Config::ErrorResult CMasterAlgorithm::layoutMsg(const std::string_view& sv) {
     const auto stateErr   = [](std::string msg) { return Config::configError(std::move(msg), Config::eConfigErrorLevel::WARNING, Config::eConfigErrorCode::INVALID_STATE); };
 
     if (vars.size() < 1 || vars[0].empty()) {
-        LOG(Log::ERR, "layoutmsg called without params");
+        Log::logger->log(Log::ERR, "layoutmsg called without params");
         return invalidArg("layoutmsg without params");
     }
 

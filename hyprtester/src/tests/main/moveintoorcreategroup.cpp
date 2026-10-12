@@ -18,10 +18,16 @@ TEST_CASE(moveIntoOrCreateGroup) {
     OK(getFromSocket("/eval hl.config({ group = { auto_group = false } })"));
 
     NLog::log("{}Spawning kittyA", Colors::YELLOW);
-    SPAWN_KITTY("kitty_A");
+    auto kittyA = Tests::spawnKitty("kitty_A");
+    if (!kittyA) {
+        FAIL_TEST("Could not spawn kitty_A");
+    }
 
     NLog::log("{}Spawning kittyB", Colors::YELLOW);
-    SPAWN_KITTY("kitty_B");
+    auto kittyB = Tests::spawnKitty("kitty_B");
+    if (!kittyB) {
+        FAIL_TEST("Could not spawn kitty_B");
+    }
 
     NLog::log("{}Expecting 2 windows", Colors::YELLOW);
     ASSERT(Tests::windowCount(), 2);
@@ -56,11 +62,11 @@ TEST_CASE(moveIntoOrCreateGroup) {
     NLog::log("{}Testing moveintoorcreategroup into existing group", Colors::YELLOW);
 
     NLog::log("{}Spawning kittyC", Colors::YELLOW);
-    SPAWN_KITTY("kitty_C");
+    auto kittyC = Tests::spawnKitty("kitty_C");
     NLog::log("{}Spawning kittyD", Colors::YELLOW);
-    SPAWN_KITTY("kitty_D");
+    auto kittyD = Tests::spawnKitty("kitty_D");
     NLog::log("{}Spawning kittyE", Colors::YELLOW);
-    SPAWN_KITTY("kitty_E");
+    auto kittyE = Tests::spawnKitty("kitty_E");
 
     NLog::log("{}Expecting 3 windows", Colors::YELLOW);
     ASSERT(Tests::windowCount(), 3);
@@ -99,16 +105,20 @@ TEST_CASE(crossMonitorGroupJoin) {
 
     // Source group: 2 kittys on the default monitor, merged into one group
     OK(getFromSocket("/dispatch hl.dsp.focus({ workspace = 'name:groupcross-src' })"));
-    SPAWN_KITTY("groupcross_srcA");
-    SPAWN_KITTY("groupcross_srcB");
+    auto srcA = Tests::spawnKitty("groupcross_srcA");
+    auto srcB = Tests::spawnKitty("groupcross_srcB");
+    if (!srcA || !srcB)
+        FAIL_TEST("Could not spawn source kittys");
     OK(getFromSocket("/dispatch hl.dsp.focus({ window = 'class:groupcross_srcB' })"));
     OK(getFromSocket("/dispatch hl.dsp.window.move({ into_or_create_group = 'left' })"));
     const auto MON_SRC_ID = Tests::getAttribute(getFromSocket("/activewindow"), "monitor");
 
     // Destination group: 2 kittys on the new monitor, merged into one group
     OK(getFromSocket("/dispatch hl.dsp.focus({ workspace = 'name:groupcross-dst' })"));
-    SPAWN_KITTY("groupcross_dstA");
-    SPAWN_KITTY("groupcross_dstB");
+    auto dstA = Tests::spawnKitty("groupcross_dstA");
+    auto dstB = Tests::spawnKitty("groupcross_dstB");
+    if (!dstA || !dstB)
+        FAIL_TEST("Could not spawn destination kittys");
     OK(getFromSocket("/dispatch hl.dsp.focus({ window = 'class:groupcross_dstB' })"));
     OK(getFromSocket("/dispatch hl.dsp.window.move({ into_or_create_group = 'right' })"));
     const auto MON_DST_ID = Tests::getAttribute(getFromSocket("/activewindow"), "monitor");

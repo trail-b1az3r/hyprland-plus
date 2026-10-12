@@ -10,15 +10,12 @@
 #include "../../animation/AnimationManager.hpp"
 #include "../../render/Renderer.hpp"
 #include "../../config/shared/animation/AnimationTree.hpp"
-#include "../../config/ConfigValue.hpp"
 #include "../../output/Monitor.hpp"
 #include "../../managers/input/InputManager.hpp"
-#include "../../ipc/s2/S2.hpp"
+#include "../../managers/EventManager.hpp"
 #include "../../managers/fullscreen/FullscreenController.hpp"
 #include "../../event/EventBus.hpp"
 #include "../../state/MonitorState.hpp"
-#include "popup/WaylandPopupBackend.hpp"
-#include "Popup.hpp"
 
 using namespace Desktop;
 using namespace Desktop::View;
@@ -34,8 +31,7 @@ PHLLS CLayerSurface::create(SP<CLayerShellResource> resource) {
     pLS->m_self           = pLS;
     pLS->m_namespace      = resource->m_layerNamespace;
     pLS->m_layer          = std::clamp(resource->m_current.layer, ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND, ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY);
-    pLS->setPopupHead(CPopup::create(pLS));
-    pLS->setSubsurfaceHead(CSubsurface::create(pLS));
+    pLS->m_popupHead      = CPopup::create(pLS);
 
     Animation::mgr()->createAnimation(0.f, pLS->m_alpha.get(LS_ALPHA_FADE), Config::animationTree()->getAnimationPropertyConfig("fadeLayersIn"), pLS, AVARDAMAGE_ENTIRE);
     Animation::mgr()->createAnimation(Vector2D(0, 0), pLS->positionAnimation(), Config::animationTree()->getAnimationPropertyConfig("layersIn"), pLS, AVARDAMAGE_ENTIRE);
@@ -46,7 +42,8 @@ PHLLS CLayerSurface::create(SP<CLayerShellResource> resource) {
     pLS->initView(pLS, VIEW_TYPE_LAYER_SURFACE);
 
     if (!pMonitor) {
-        LOG(Log::DEBUG, "LayerSurface {:x} (namespace {} layer {}) created on NO MONITOR ?!", rc<uintptr_t>(resource.get()), resource->m_layerNamespace, sc<int>(pLS->m_layer));
+        Log::logger->log(Log::DEBUG, "LayerSurface {:x} (namespace {} layer {}) created on NO MONITOR ?!", rc<uintptr_t>(resource.get()), resource->m_layerNamespace,
+                         sc<int>(pLS->m_layer));
 
         return pLS;
     }
@@ -57,8 +54,8 @@ PHLLS CLayerSurface::create(SP<CLayerShellResource> resource) {
     pLS->m_monitor = pMonitor;
     pMonitor->m_layerSurfaceLayers[resource->m_current.layer].emplace_back(pLS);
 
-    LOG(Log::DEBUG, "LayerSurface {:x} (namespace {} layer {}) created on monitor {}", rc<uintptr_t>(resource.get()), resource->m_layerNamespace, sc<int>(pLS->m_layer),
-        pMonitor->m_name);
+    Log::logger->log(Log::DEBUG, "LayerSurface {:x} (namespace {} layer {}) created on monitor {}", rc<uintptr_t>(resource.get()), resource->m_layerNamespace,
+                     sc<int>(pLS->m_layer), pMonitor->m_name);
 
     return pLS;
 }
@@ -77,14 +74,10 @@ void CLayerSurface::registerCallbacks() {
 }
 
 CLayerSurface::CLayerSurface(SP<CLayerShellResource> resource_) : IView(CWLSurface::create()), m_layerSurface(resource_), m_animationController(this), m_alpha(LS_ALPHA_LAST) {
-    m_listeners.commit   = m_layerSurface->m_events.commit.listen([this] { onCommit(); });
-    m_listeners.map      = m_layerSurface->m_events.map.listen([this] { onMap(); });
-    m_listeners.unmap    = m_layerSurface->m_events.unmap.listen([this] { onUnmap(); });
-    m_listeners.destroy  = m_layerSurface->m_events.destroy.listen([this] { onDestroy(); });
-    m_listeners.newPopup = m_layerSurface->m_events.newPopup.listen([this](const auto& resource) {
-        if (popupHead())
-            popupHead()->onNewPopup(makeWaylandPopupBackend(resource));
-    });
+    m_listeners.commit  = m_layerSurface->m_events.commit.listen([this] { onCommit(); });
+    m_listeners.map     = m_layerSurface->m_events.map.listen([this] { onMap(); });
+    m_listeners.unmap   = m_layerSurface->m_events.unmap.listen([this] { onUnmap(); });
+    m_listeners.destroy = m_layerSurface->m_events.destroy.listen([this] { onDestroy(); });
 }
 
 CLayerSurface::~CLayerSurface() {
@@ -107,12 +100,8 @@ eViewType CLayerSurface::type() const {
     return VIEW_TYPE_LAYER_SURFACE;
 }
 
-bool CLayerSurface::mapped() const {
+bool CLayerSurface::visible() const {
     return m_mapped && m_layerSurface && m_layerSurface->m_mapped && m_wlSurface && m_wlSurface->resource();
-}
-
-bool CLayerSurface::focusAvailable() const {
-    return true;
 }
 
 std::optional<CBox> CLayerSurface::logicalBox() const {
@@ -120,7 +109,7 @@ std::optional<CBox> CLayerSurface::logicalBox() const {
 }
 
 std::optional<CBox> CLayerSurface::surfaceLogicalBox() const {
-    if (!mapped() || !acceptsInput() || !alphaNonZero())
+    if (!visible())
         return std::nullopt;
 
     return geometricBox(GEOMETRIC_CURRENT);
@@ -131,23 +120,22 @@ bool CLayerSurface::desktopComponent() const {
 }
 
 void CLayerSurface::onDestroy() {
-    LOG(Log::DEBUG, "LayerSurface {:x} destroyed", rc<uintptr_t>(m_layerSurface.get()));
+    Log::logger->log(Log::DEBUG, "LayerSurface {:x} destroyed", rc<uintptr_t>(m_layerSurface.get()));
 
     const auto SELF     = m_self.lock();
     const auto PMONITOR = m_monitor.lock();
 
     if (!PMONITOR)
-        LOG(Log::WARN, "Layersurface destroyed on an invalid monitor (removed?)");
+        Log::logger->log(Log::WARN, "Layersurface destroyed on an invalid monitor (removed?)");
 
     if (m_mapped) {
-        LOG(Log::DEBUG, "Forcing an unmap of a LS that did a straight destroy!");
+        Log::logger->log(Log::DEBUG, "Forcing an unmap of a LS that did a straight destroy!");
         onUnmap();
     }
 
-    resetPopupHead();
-    resetSubsurfaceHead();
+    m_popupHead.reset();
 
-    m_flags |= LAYER_FLAG_DEAD;
+    m_noProcess = true;
 
     // rearrange to fix the reserved areas
     if (PMONITOR) {
@@ -167,17 +155,16 @@ void CLayerSurface::onDestroy() {
     m_listeners.destroy.reset();
     m_listeners.map.reset();
     m_listeners.commit.reset();
-    m_listeners.newPopup.reset();
 
     Desktop::layerState()->removeSafe(SELF);
 }
 
 void CLayerSurface::onMap() {
-    LOG(Log::DEBUG, "LayerSurface {:x} mapped", rc<uintptr_t>(m_layerSurface.get()));
+    Log::logger->log(Log::DEBUG, "LayerSurface {:x} mapped", rc<uintptr_t>(m_layerSurface.get()));
 
-    m_mapped                = true;
-    m_keyboardInteractivity = m_layerSurface->m_current.keyboardInteractivity;
-    m_flags |= LAYER_FLAG_ABOVE_FULLSCREEN;
+    m_mapped          = true;
+    m_interactivity   = m_layerSurface->m_current.interactivity;
+    m_aboveFullscreen = true;
 
     m_ruleApplicator->propertiesChanged(Desktop::Rule::RULE_PROP_ALL);
 
@@ -195,26 +182,28 @@ void CLayerSurface::onMap() {
 
     m_wlSurface->resource()->enter(PMONITOR->m_self.lock());
 
-    const bool KEYBOARD_EXCLUSIVE = m_layerSurface->m_current.keyboardInteractivity == ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE;
+    const bool ISEXCLUSIVE = m_layerSurface->m_current.interactivity == ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE;
 
-    if (KEYBOARD_EXCLUSIVE)
-        g_pInputManager->m_exclusiveKeyboardLSes.push_back(m_self);
+    if (ISEXCLUSIVE)
+        g_pInputManager->m_exclusiveLSes.push_back(m_self);
 
-    const bool GRABS_KEYBOARD = KEYBOARD_EXCLUSIVE ||
-        (m_layerSurface->m_current.keyboardInteractivity != ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE &&
+    const bool GRABSFOCUS = ISEXCLUSIVE ||
+        (m_layerSurface->m_current.interactivity != ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE &&
          // don't focus if constrained
          (g_pSeatManager->m_mouse.expired() || !g_pInputManager->isConstrained()));
 
-    if (GRABS_KEYBOARD) {
+    if (GRABSFOCUS) {
         // TODO: use the new superb really very cool grab
         if (g_pSeatManager->m_seatGrab && !g_pSeatManager->m_seatGrab->accepts(m_wlSurface->resource()))
             g_pSeatManager->setGrab(nullptr);
 
-        takeKeyboardFocus();
-    }
+        g_pInputManager->releaseAllMouseButtons();
+        Desktop::focusState()->rawSurfaceFocus(m_wlSurface->resource());
 
-    // update pointer focus
-    g_pInputManager->simulateMouseMovement();
+        const auto LOCAL = g_pInputManager->getMouseCoordsInternal() - Vector2D(m_geometry.x + PMONITOR->m_position.x, m_geometry.y + PMONITOR->m_position.y);
+        g_pSeatManager->setPointerFocus(m_wlSurface->resource(), LOCAL);
+        g_pInputManager->m_emptyFocusCursorSet = false;
+    }
 
     m_position = Vector2D(m_geometry.x, m_geometry.y);
 
@@ -226,22 +215,22 @@ void CLayerSurface::onMap() {
     m_alpha.get(LS_ALPHA_FADE)->setConfig(Config::animationTree()->getAnimationPropertyConfig("fadeLayersIn"));
     m_animationController.apply(m_animationController.animateIn());
 
-    IPC::Socket2::sock()->postEvent({.event = "openlayer", .data = m_namespace});
+    g_pEventManager->postEvent(SHyprIPCEvent{.event = "openlayer", .data = m_namespace});
     Event::bus()->m_events.layer.opened.emit(m_self.lock());
 
     updateSurfaceScaleTransformDetails();
 }
 
 void CLayerSurface::onUnmap() {
-    LOG(Log::DEBUG, "LayerSurface {:x} unmapped", rc<uintptr_t>(m_layerSurface.get()));
+    Log::logger->log(Log::DEBUG, "LayerSurface {:x} unmapped", rc<uintptr_t>(m_layerSurface.get()));
 
-    IPC::Socket2::sock()->postEvent({.event = "closelayer", .data = m_layerSurface->m_layerNamespace});
+    g_pEventManager->postEvent(SHyprIPCEvent{.event = "closelayer", .data = m_layerSurface->m_layerNamespace});
     Event::bus()->m_events.layer.closed.emit(m_self.lock());
 
-    std::erase_if(g_pInputManager->m_exclusiveKeyboardLSes, [this](const auto& other) { return !other || other == m_self; });
+    std::erase_if(g_pInputManager->m_exclusiveLSes, [this](const auto& other) { return !other || other == m_self; });
 
     if (!m_monitor) {
-        LOG(Log::WARN, "Layersurface unmapping on invalid monitor (removed?) ignoring.");
+        Log::logger->log(Log::WARN, "Layersurface unmapping on invalid monitor (removed?) ignoring.");
 
         m_mapped = false;
         if (m_layerSurface && m_layerSurface->m_surface)
@@ -335,11 +324,8 @@ void CLayerSurface::onCommit() {
                 }
             }
 
-            m_layer = NEW_LAYER;
-            if (NEW_LAYER >= ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY)
-                m_flags |= LAYER_FLAG_ABOVE_FULLSCREEN;
-            else
-                m_flags &= ~LAYER_FLAG_ABOVE_FULLSCREEN;
+            m_layer           = NEW_LAYER;
+            m_aboveFullscreen = NEW_LAYER >= ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY;
 
             // if in fullscreen, only overlay can be above.
             *m_alpha.get(LS_ALPHA_FADE) = Fullscreen::controller()->hasFullscreen(PMONITOR) ? (m_layer >= ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY ? 1.F : 0.F) : 1.F;
@@ -380,57 +366,58 @@ void CLayerSurface::onCommit() {
             m_realSize->setValueAndWarp(m_geometry.size());
     }
 
-    if (m_mapped && (m_layerSurface->m_current.committed & CLayerShellResource::eCommittedState::STATE_KEYBOARD_INTERACTIVITY)) {
+    if (m_mapped && (m_layerSurface->m_current.committed & CLayerShellResource::eCommittedState::STATE_INTERACTIVITY)) {
         bool WASLASTFOCUS = false;
         m_layerSurface->m_surface->breadthfirst(
             [&WASLASTFOCUS](SP<CWLSurfaceResource> surf, const Vector2D& offset, void* data) { WASLASTFOCUS = WASLASTFOCUS || g_pSeatManager->m_state.keyboardFocus == surf; },
             nullptr);
-        if (!WASLASTFOCUS && popupHead()) {
-            popupHead()->breadthfirst(
+        if (!WASLASTFOCUS && m_popupHead) {
+            m_popupHead->breadthfirst(
                 [&WASLASTFOCUS](WP<Desktop::View::CPopup> popup, void* data) {
                     WASLASTFOCUS = WASLASTFOCUS || (popup->wlSurface() && g_pSeatManager->m_state.keyboardFocus == popup->wlSurface()->resource());
                 },
                 nullptr);
         }
-        const bool WAS_KEYBOARD_EXCLUSIVE = m_keyboardInteractivity == ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE;
-        const bool KEYBOARD_EXCLUSIVE     = m_layerSurface->m_current.keyboardInteractivity == ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE;
+        const bool WASEXCLUSIVE = m_interactivity == ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE;
+        const bool ISEXCLUSIVE  = m_layerSurface->m_current.interactivity == ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE;
 
-        if (!WAS_KEYBOARD_EXCLUSIVE && KEYBOARD_EXCLUSIVE)
-            g_pInputManager->m_exclusiveKeyboardLSes.push_back(m_self);
-        else if (WAS_KEYBOARD_EXCLUSIVE && !KEYBOARD_EXCLUSIVE)
-            std::erase_if(g_pInputManager->m_exclusiveKeyboardLSes, [this](const auto& other) { return !other || other == m_self; });
+        if (!WASEXCLUSIVE && ISEXCLUSIVE)
+            g_pInputManager->m_exclusiveLSes.push_back(m_self);
+        else if (WASEXCLUSIVE && !ISEXCLUSIVE)
+            std::erase_if(g_pInputManager->m_exclusiveLSes, [this](const auto& other) { return !other || other == m_self; });
 
         // if the surface was focused and interactive but now isn't, refocus
-        if (WASLASTFOCUS && m_layerSurface->m_current.keyboardInteractivity == ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE) {
+        if (WASLASTFOCUS && m_layerSurface->m_current.interactivity == ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE) {
             // moveMouseUnified won't focus non interactive layers but it won't unfocus them either,
             // so unfocus the surface here.
             Desktop::focusState()->rawSurfaceFocus(nullptr);
             g_pInputManager->refocusLastWindow(m_monitor.lock());
-        } else if (WASLASTFOCUS && WAS_KEYBOARD_EXCLUSIVE && m_layerSurface->m_current.keyboardInteractivity == ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_ON_DEMAND) {
+        } else if (WASLASTFOCUS && WASEXCLUSIVE && m_layerSurface->m_current.interactivity == ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_ON_DEMAND) {
             g_pInputManager->simulateMouseMovement();
-        } else if (!WAS_KEYBOARD_EXCLUSIVE && KEYBOARD_EXCLUSIVE) {
+        } else if (!WASEXCLUSIVE && ISEXCLUSIVE) {
             // if now exclusive and not previously
             g_pSeatManager->setGrab(nullptr);
-            takeKeyboardFocus();
-            g_pInputManager->simulateMouseMovement();
+            g_pInputManager->releaseAllMouseButtons();
+            Desktop::focusState()->rawSurfaceFocus(m_wlSurface->resource());
+
+            const auto LOCAL = g_pInputManager->getMouseCoordsInternal() - Vector2D(m_geometry.x + PMONITOR->m_position.x, m_geometry.y + PMONITOR->m_position.y);
+            g_pSeatManager->setPointerFocus(m_wlSurface->resource(), LOCAL);
+            g_pInputManager->m_emptyFocusCursorSet = false;
         }
     }
 
-    m_keyboardInteractivity = m_layerSurface->m_current.keyboardInteractivity;
+    m_interactivity = m_layerSurface->m_current.interactivity;
 
     g_pHyprRenderer->damageSurface(m_wlSurface->resource(), m_position.x, m_position.y);
 
     updateSurfaceScaleTransformDetails();
 }
 
-void CLayerSurface::takeKeyboardFocus() {
-    g_pInputManager->releaseAllMouseButtons();
-    Desktop::focusState()->rawSurfaceFocus(m_wlSurface->resource());
+int CLayerSurface::popupsCount() {
+    if (!m_layerSurface || !m_mapped || !m_popupHead)
+        return 0;
 
-    // Release the old pointer focus so native constraints and confine_pointer rules cannot
-    // prevent the subsequent mouse movement from hit-testing the layer.
-    if (g_pSeatManager->m_state.keyboardFocus == m_wlSurface->resource() && g_pSeatManager->m_state.pointerFocus != m_wlSurface->resource())
-        g_pSeatManager->setPointerFocus(nullptr, {});
+    return m_popupHead->popupTreeCount();
 }
 
 MONITORID CLayerSurface::monitorID() {
@@ -450,7 +437,7 @@ pid_t CLayerSurface::getPID() {
 }
 
 void CLayerSurface::updateSurfaceScaleTransformDetails() {
-    if (!mapped())
+    if (!aliveAndVisible())
         return;
 
     const auto PMONITOR = m_monitor.lock();
@@ -480,10 +467,6 @@ Types::CMultiAVarContainer<float, uint8_t>& CLayerSurface::alpha() {
     return m_alpha;
 }
 
-const Types::CMultiAVarContainer<float, uint8_t>& CLayerSurface::alpha() const {
-    return m_alpha;
-}
-
 std::optional<uint8_t> CLayerSurface::alphaGenericToKey(eAlphaModifiableProp p) {
     switch (p) {
         case IAlphaModifiable::ALPHA_MODIFIABLE_FADE: return LS_ALPHA_FADE;
@@ -494,20 +477,4 @@ std::optional<uint8_t> CLayerSurface::alphaGenericToKey(eAlphaModifiableProp p) 
 
     static_assert(ALPHA_MODIFIABLE_LAST == 1);
     UNREACHABLE();
-}
-
-bool CLayerSurface::shouldBlur() const {
-    static auto PBLUR = CConfigValue<Config::INTEGER>("decoration:blur:enabled");
-    if (!*PBLUR)
-        return false;
-
-    auto surface = wlSurface();
-    if (surface && surface->m_hasBackgroundEffect)
-        return !surface->m_blurRegion.empty();
-
-    return m_ruleApplicator->blur().valueOrDefault();
-}
-
-bool CLayerSurface::cantLockCursor() const {
-    return false;
 }

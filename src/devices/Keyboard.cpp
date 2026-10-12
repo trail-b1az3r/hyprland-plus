@@ -11,7 +11,7 @@ SP<CKeyboard> CKeyboard::create(SP<Aquamarine::IKeyboard> keeb) {
     return pKeeb;
 }
 
-bool CKeyboard::isVirtual() const {
+bool CKeyboard::isVirtual() {
     return false;
 }
 

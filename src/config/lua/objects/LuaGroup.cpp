@@ -3,8 +3,7 @@
 #include "LuaObjectHelpers.hpp"
 
 #include "../../../desktop/view/Group.hpp"
-#include "../../../desktop/view/window/Window.hpp"
-#include "../../../desktop/view/window/WindowGroupMembership.hpp"
+#include "../../../desktop/view/Window.hpp"
 
 #include <optional>
 #include <string_view>
@@ -93,13 +92,13 @@ static int groupAdd(lua_State* L) {
             return 0;
     }
 
-    if (window->grouping().group() == group)
+    if (window->m_group == group)
         return 0;
 
     if (group->denied())
         return Config::Lua::Bindings::Internal::configError(L, "{}: target group is denied", FN);
 
-    if (!window->grouping().canBeGroupedInto(group))
+    if (!window->canBeGroupedInto(group))
         return Config::Lua::Bindings::Internal::configError(L, "{}: window cannot be added to group", FN);
 
     group->add(window, index);
@@ -139,7 +138,7 @@ static int groupIndex(lua_State* L) {
     auto*      ref   = sc<WP<Desktop::View::CGroup>*>(luaL_checkudata(L, 1, MT));
     const auto group = ref->lock();
     if (!group) {
-        LOG(Log::DEBUG, "[lua] Tried to access an expired object");
+        Log::logger->log(Log::DEBUG, "[lua] Tried to access an expired object");
         lua_pushnil(L);
         return 1;
     }
@@ -186,11 +185,6 @@ void Objects::CLuaGroup::setup(lua_State* L) {
 }
 
 void Objects::CLuaGroup::push(lua_State* L, SP<Desktop::View::CGroup> group) {
-    if (!group) {
-        lua_pushnil(L);
-        return;
-    }
-
     new (lua_newuserdata(L, sizeof(WP<Desktop::View::CGroup>))) WP<Desktop::View::CGroup>(group);
     luaL_getmetatable(L, MT);
     lua_setmetatable(L, -2);

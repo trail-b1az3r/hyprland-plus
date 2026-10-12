@@ -42,6 +42,7 @@ perf.data
 flame.svg
 
 PKGBUILD
+!packaging/aur/PKGBUILD
 
 src/version.h
 hyprpm/Makefile
@@ -56,4 +57,3 @@ debug-tools/flamegraph
 meta/hl.meta.lua
 
 hyprtester/pointer-scroll.txt
-/keyboard-modifiers.txt

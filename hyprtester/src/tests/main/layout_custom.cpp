@@ -6,22 +6,22 @@
 TEST_CASE(layoutCustomGrid) {
     OK(getFromSocket("r/eval hl.config({ general = { layout = 'lua:grid' } })"));
 
-    SPAWN_KITTY("kitty_A");
-    SPAWN_KITTY("kitty_B");
+    ASSERT(!!Tests::spawnKitty("kitty_A"), true);
+    ASSERT(!!Tests::spawnKitty("kitty_B"), true);
 
     {
         auto clients = getFromSocket("/clients");
         EXPECT_COUNT_STRING(clients, "size: 931,1036", 2);
     }
 
-    SPAWN_KITTY("kitty_C");
+    ASSERT(!!Tests::spawnKitty("kitty_C"), true);
 
     {
         auto clients = getFromSocket("/clients");
         EXPECT_COUNT_STRING(clients, "size: 931,511", 3);
     }
 
-    SPAWN_KITTY("kitty_D");
+    ASSERT(!!Tests::spawnKitty("kitty_D"), true);
 
     {
         auto clients = getFromSocket("/clients");
@@ -32,22 +32,22 @@ TEST_CASE(layoutCustomGrid) {
 TEST_CASE(layoutCustomColumns) {
     OK(getFromSocket("r/eval hl.config({ general = { layout = 'lua:columns' } })"));
 
-    SPAWN_KITTY("kitty_A");
-    SPAWN_KITTY("kitty_B");
+    ASSERT(!!Tests::spawnKitty("kitty_A"), true);
+    ASSERT(!!Tests::spawnKitty("kitty_B"), true);
 
     {
         auto clients = getFromSocket("/clients");
         EXPECT_COUNT_STRING(clients, "size: 931,1036", 2);
     }
 
-    SPAWN_KITTY("kitty_C");
+    ASSERT(!!Tests::spawnKitty("kitty_C"), true);
 
     {
         auto clients = getFromSocket("/clients");
         EXPECT_COUNT_STRING(clients, ",1036\n", 3); // this won't split evenly
     }
 
-    SPAWN_KITTY("kitty_D");
+    ASSERT(!!Tests::spawnKitty("kitty_D"), true);
 
     {
         auto clients = getFromSocket("/clients");

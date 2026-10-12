@@ -6,7 +6,6 @@
 #include "../../desktop/view/WLSurface.hpp"
 #include "../../helpers/math/Math.hpp"
 #include "../../helpers/memory/Memory.hpp"
-#include "../../helpers/time/Time.hpp"
 #include "../../macros.hpp"
 #include "../../managers/eventLoop/EventLoopManager.hpp"
 #include "../../managers/XCursorManager.hpp"
@@ -15,8 +14,6 @@
 AQUAMARINE_FORWARD(IBuffer);
 
 namespace Pointer::Cursor {
-
-    class CCursorShape;
 
     class CCursorBuffer : public Aquamarine::IBuffer {
       public:
@@ -62,35 +59,22 @@ namespace Pointer::Cursor {
         float                   getScaledSize() const;
 
       private:
-        struct SScaledShape {
-            float            scale = 1.F;
-            SP<CCursorShape> shape;
-        };
+        bool                               m_ourBufferConnected = false;
+        std::vector<SP<CCursorBuffer>>     m_cursorBuffers;
 
-        bool                                      prepareHyprcursor(const std::string& name);
-        void                                      publishHyprcursor();
-        void                                      releaseStyles();
+        UP<Hyprcursor::CHyprcursorManager> m_hyprcursor;
+        UP<CXCursorManager>                m_xcursor;
+        SP<SXCursors>                      m_currentXcursor;
 
-        bool                                      m_ourBufferConnected = false;
-        std::vector<SP<CCursorBuffer>>            m_cursorBuffers;
+        std::string                        m_theme       = "";
+        int                                m_size        = 0;
+        float                              m_cursorScale = 1.0;
 
-        UP<Hyprcursor::CHyprcursorManager>        m_hyprcursor;
-        UP<CXCursorManager>                       m_xcursor;
-        SP<SXCursors>                             m_currentXcursor;
+        Hyprcursor::SCursorStyleInfo       m_currentStyleInfo;
 
-        std::string                               m_lastCursorName = "left_ptr";
-        std::string                               m_theme          = "";
-        int                                       m_size           = 0;
-        float                                     m_cursorScale    = 1.0;
-
-        Hyprcursor::SCursorStyleInfo              m_currentStyleInfo;
-        std::vector<Hyprcursor::SCursorStyleInfo> m_styles;
-        std::vector<float>                        m_scales;
-        std::vector<SScaledShape>                 m_scaledShapes;
-        Time::steady_tp                           m_animationStarted;
-
-        SP<CEventLoopTimer>                       m_animationTimer;
-        int                                       m_currentAnimationFrame = 0;
+        SP<CEventLoopTimer>                m_animationTimer;
+        int                                m_currentAnimationFrame = 0;
+        Hyprcursor::SCursorShapeData       m_currentCursorShapeData;
     };
 
     UP<CCursorManager>& mgr();

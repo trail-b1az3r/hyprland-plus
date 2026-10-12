@@ -1,5 +1,4 @@
 #include "FullscreenGesture.hpp"
-#include "../../../../render/decorations/DecorationPositioner.hpp"
 
 #include "../../../../Compositor.hpp"
 #include "../../../../desktop/state/FocusState.hpp"

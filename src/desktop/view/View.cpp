@@ -37,3 +37,14 @@ void IView::initView(WP<IView> self, eViewType type) {
 SP<CWLSurfaceResource> IView::resource() const {
     return m_wlSurface ? m_wlSurface->resource() : nullptr;
 }
+
+bool IView::aliveAndVisible() const {
+    auto res = resource();
+    if (!res)
+        return false;
+
+    if (!res->m_mapped)
+        return false;
+
+    return visible();
+}

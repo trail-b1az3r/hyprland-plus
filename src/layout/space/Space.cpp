@@ -4,7 +4,8 @@
 #include "../algorithm/Algorithm.hpp"
 
 #include "../../debug/log/Logger.hpp"
-#include "../../workspace/HLWorkspace.hpp"
+#include "../../desktop/Workspace.hpp"
+#include "../../desktop/view/Window.hpp"
 #include "../../config/shared/workspace/WorkspaceRuleManager.hpp"
 #include "../../config/ConfigValue.hpp"
 #include "../../event/EventBus.hpp"
@@ -36,8 +37,60 @@ CSpace::CSpace(PHLWORKSPACE parent) : m_parent(parent) {
     });
 }
 
+// The strip at one screen edge that the superposition windows share. Edges: 0 left, 1 right, 2 top, 3 bottom.
+static CBox superpositionStrip(const CBox& area, Config::INTEGER edge, Config::FLOAT size) {
+    switch (edge) {
+        case 0: return {area.x, area.y, area.w * size, area.h};
+        case 2: return {area.x, area.y, area.w, area.h * size};
+        case 3: return {area.x, area.y + area.h * (1.F - size), area.w, area.h * size};
+        default: return {area.x + area.w * (1.F - size), area.y, area.w * size, area.h};
+    }
+}
+
+bool CSpace::isSuperposition(const SP<ITarget>& t) const {
+    const auto W = t->window();
+    return W && !t->floating() && W->m_ruleApplicator->superposition().valueOrDefault();
+}
+
+std::vector<SP<ITarget>> CSpace::superpositionTargets() const {
+    std::vector<SP<ITarget>> result;
+    for (const auto& w : m_targets) {
+        const auto t = w.lock();
+        if (t && isSuperposition(t))
+            result.emplace_back(t);
+    }
+    return result;
+}
+
+void CSpace::placeSuperpositions() {
+    const auto TARGETS = superpositionTargets();
+    if (TARGETS.empty() || !m_parent || !m_parent->m_monitor)
+        return;
+
+    static auto PSUPEREDGE = CConfigValue<Config::INTEGER>("superposition:edge");
+    static auto PSUPERSIZE = CConfigValue<Config::FLOAT>("superposition:size");
+
+    const auto  STRIP    = superpositionStrip(m_parent->m_monitor->logicalBoxMinusReserved(), *PSUPEREDGE, *PSUPERSIZE);
+    const bool  VERTICAL = *PSUPEREDGE == 0 || *PSUPEREDGE == 1; // left or right: the windows stack from top to bottom
+    const auto  N        = sc<double>(TARGETS.size());
+
+    for (size_t i = 0; i < TARGETS.size(); ++i) {
+        const auto I   = sc<double>(i);
+        const CBox BOX = VERTICAL ? CBox{STRIP.x, STRIP.y + I * STRIP.h / N, STRIP.w, STRIP.h / N} : CBox{STRIP.x + I * STRIP.w / N, STRIP.y, STRIP.w / N, STRIP.h};
+        TARGETS[i]->setPositionGlobal(BOX);
+        TARGETS[i]->warpPositionSize();
+    }
+}
+
 void CSpace::add(SP<ITarget> t) {
     m_targets.emplace_back(t);
+
+    if (isSuperposition(t)) {
+        // Not in the tile tree: the strip is placed instead, and in reserve mode the tiles' area shrinks.
+        recalculate();
+        m_parent->updateWindows();
+        return;
+    }
 
     recheckWorkArea();
 
@@ -50,6 +103,12 @@ void CSpace::add(SP<ITarget> t) {
 void CSpace::move(SP<ITarget> t, std::optional<Vector2D> focalPoint) {
     m_targets.emplace_back(t);
 
+    if (isSuperposition(t)) {
+        recalculate();
+        m_parent->updateWindows();
+        return;
+    }
+
     recheckWorkArea();
 
     if (m_algorithm)
@@ -59,12 +118,17 @@ void CSpace::move(SP<ITarget> t, std::optional<Vector2D> focalPoint) {
 }
 
 void CSpace::remove(SP<ITarget> t) {
+    const bool SUPERPOSITION = isSuperposition(t);
+
     std::erase_if(m_targets, [&t](const auto& e) { return !e || e == t; });
 
     recheckWorkArea();
 
-    if (m_algorithm)
+    if (m_algorithm && !SUPERPOSITION)
         m_algorithm->removeTarget(t);
+
+    if (SUPERPOSITION)
+        recalculate();
 
     if (m_parent) // can be null if the workspace is gone
         m_parent->updateWindows();
@@ -76,7 +140,7 @@ void CSpace::setAlgorithmProvider(SP<CAlgorithm> algo) {
 
 void CSpace::recheckWorkArea() {
     if (!m_parent || !m_parent->m_monitor) {
-        LOG(Log::ERR, "CSpace: recheckWorkArea on no parent / mon?!");
+        Log::logger->log(Log::ERR, "CSpace: recheckWorkArea on no parent / mon?!");
         return;
     }
 
@@ -104,6 +168,26 @@ void CSpace::recheckWorkArea() {
 
     m_workArea         = workArea;
     m_floatingWorkArea = floatWorkArea;
+
+    // Reserve mode: the strip the superposition windows sit on comes out of the area the tiles use.
+    static auto PSUPEREDGE    = CConfigValue<Config::INTEGER>("superposition:edge");
+    static auto PSUPERSIZE    = CConfigValue<Config::FLOAT>("superposition:size");
+    static auto PSUPERRESERVE = CConfigValue<Config::BOOL>("superposition:reserve");
+    if (*PSUPERRESERVE && m_parent && m_parent->m_monitor && !superpositionTargets().empty()) {
+        const auto STRIP = superpositionStrip(m_parent->m_monitor->logicalBoxMinusReserved(), *PSUPEREDGE, *PSUPERSIZE);
+        switch (*PSUPEREDGE) {
+            case 0:
+                m_workArea.x += STRIP.w;
+                m_workArea.w -= STRIP.w;
+                break;
+            case 2:
+                m_workArea.y += STRIP.h;
+                m_workArea.h -= STRIP.h;
+                break;
+            case 3: m_workArea.h -= STRIP.h; break;
+            default: m_workArea.w -= STRIP.w; break;
+        }
+    }
 }
 
 const CBox& CSpace::workArea(bool floating) const {
@@ -151,6 +235,8 @@ void CSpace::recalculate(eRecalculateReason reason) {
 
     if (m_algorithm)
         m_algorithm->recalculate(reason);
+
+    placeSuperpositions();
 }
 
 Config::ErrorResult CSpace::layoutMsg(const std::string_view& sv) {

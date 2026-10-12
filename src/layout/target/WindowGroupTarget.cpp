@@ -31,7 +31,7 @@ void CWindowGroupTarget::setPositionGlobal(const STargetBox& box, uint8_t flags)
 
 void CWindowGroupTarget::updatePos(uint8_t flags) {
     for (const auto& w : m_group->windows()) {
-        w->windowTarget()->setPositionGlobal(m_box, flags);
+        w->m_target->setPositionGlobal(m_box, flags);
     }
 }
 
@@ -43,17 +43,17 @@ void CWindowGroupTarget::assignToSpace(const SP<CSpace>& space, std::optional<Ve
 }
 
 bool CWindowGroupTarget::floating() {
-    return m_group->current()->isFloating();
+    return m_group->current()->m_target->floating();
 }
 
 void CWindowGroupTarget::setFloating(bool x) {
     for (const auto& w : m_group->windows()) {
-        w->windowTarget()->setFloating(x);
+        w->m_target->setFloating(x);
     }
 }
 
 std::expected<SGeometryRequested, eGeometryFailure> CWindowGroupTarget::desiredGeometry() {
-    return m_group->current()->windowTarget()->desiredGeometry();
+    return m_group->current()->m_target->desiredGeometry();
 }
 
 PHLWINDOW CWindowGroupTarget::window() const {
@@ -74,13 +74,13 @@ void CWindowGroupTarget::damageEntire() {
 
 void CWindowGroupTarget::warpPositionSize() {
     for (const auto& w : m_group->windows()) {
-        w->windowTarget()->warpPositionSize();
+        w->m_target->warpPositionSize();
     }
 }
 
 void CWindowGroupTarget::onUpdateSpace() {
     for (const auto& w : m_group->windows()) {
-        w->windowTarget()->onUpdateSpace();
+        w->m_target->onUpdateSpace();
     }
 }
 

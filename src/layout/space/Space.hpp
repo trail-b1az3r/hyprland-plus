@@ -77,6 +77,11 @@ namespace Layout {
         // work area is in global coords
         CBox m_workArea, m_floatingWorkArea;
 
+        // Superposition windows are tiled to a strip at one edge of the screen, and are kept out of the tile tree.
+        bool                     isSuperposition(const SP<ITarget>& t) const;
+        std::vector<SP<ITarget>> superpositionTargets() const;
+        void                     placeSuperpositions();
+
         // for recalc
         CHyprSignalListener m_geomUpdateCallback;
     };

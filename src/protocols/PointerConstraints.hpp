@@ -9,7 +9,6 @@
 #include "../desktop/view/WLSurface.hpp"
 #include "../helpers/math/Math.hpp"
 #include "../helpers/signal/Signal.hpp"
-#include "../managers/input/PointerConstraintState.hpp"
 
 class CWLSurfaceResource;
 
@@ -32,20 +31,22 @@ class CPointerConstraint {
     Vector2D                      logicPositionHint();
 
   private:
-    SP<CZwpLockedPointerV1>       m_resourceLocked;
-    SP<CZwpConfinedPointerV1>     m_resourceConfined;
+    SP<CZwpLockedPointerV1>         m_resourceLocked;
+    SP<CZwpConfinedPointerV1>       m_resourceConfined;
 
-    WP<Desktop::View::CWLSurface> m_hlSurface;
+    WP<Desktop::View::CWLSurface>   m_hlSurface;
 
-    CRegion                       m_region;
-    bool                          m_hintSet             = false;
-    Vector2D                      m_positionHint        = {-1, -1};
-    Vector2D                      m_cursorPosOnActivate = {-1, -1};
-    bool                          m_locked              = false;
-    CPointerConstraintState       m_state;
+    CRegion                         m_region;
+    bool                            m_hintSet             = false;
+    Vector2D                        m_positionHint        = {-1, -1};
+    Vector2D                        m_cursorPosOnActivate = {-1, -1};
+    bool                            m_active              = false;
+    bool                            m_locked              = false;
+    bool                            m_dead                = false;
+    zwpPointerConstraintsV1Lifetime m_lifetime            = ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_ONESHOT;
 
-    void                          sharedConstructions();
-    void                          onSetRegion(wl_resource* region);
+    void                            sharedConstructions();
+    void                            onSetRegion(wl_resource* region);
 
     struct {
         CHyprSignalListener destroySurface;

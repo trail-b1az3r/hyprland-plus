@@ -6,7 +6,7 @@ class CMouse : public IPointer {
   public:
     static SP<CMouse>                create(SP<Aquamarine::IPointer> mouse);
 
-    virtual bool                     isVirtual() const;
+    virtual bool                     isVirtual();
     virtual SP<Aquamarine::IPointer> aq();
 
   private:

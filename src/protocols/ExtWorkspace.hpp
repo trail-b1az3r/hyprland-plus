@@ -58,7 +58,6 @@ class CExtWorkspaceResource {
     void                             sendState();
     void                             sendCapabilities();
     void                             sendGroup();
-    void                             sendCoordinates(bool numbered);
 
     struct {
         bool          activate   = false;
@@ -91,7 +90,6 @@ class CExtWorkspaceManagerResource {
     void                                         scheduleDone();
     [[nodiscard]] WP<CExtWorkspaceGroupResource> findGroup(const PHLMONITORREF& monitor) const;
     void                                         sendGroupToWorkspaces(const WP<CExtWorkspaceGroupResource>& group);
-    void                                         sendCoordinatesForGroup(const PHLMONITORREF& monitor, const WP<CExtWorkspaceResource>& excluded = {});
 
     UP<CExtWorkspaceManagerV1>                   m_resource;
 

@@ -1,22 +1,20 @@
 #pragma once
 #include "PassElement.hpp"
-#include "../WindowRenderPresentation.hpp"
 
 class CHyprDropShadowDecoration;
 
 class CShadowPassElement : public IPassElement {
   public:
     struct SShadowData {
-        WP<CHyprDropShadowDecoration>     deco;
-        float                             a = 1.F;
-        Render::SWindowRenderPresentation presentation;
+        CHyprDropShadowDecoration* deco = nullptr;
+        float                      a    = 1.F;
     };
 
     CShadowPassElement(const SShadowData& data_);
     virtual ~CShadowPassElement() = default;
 
-    virtual bool        needsLiveBlur(Render::CRenderContext& ctx);
-    virtual bool        needsPrecomputeBlur(Render::CRenderContext& ctx);
+    virtual bool        needsLiveBlur();
+    virtual bool        needsPrecomputeBlur();
 
     virtual const char* passName() {
         return "CShadowPassElement";

@@ -25,7 +25,8 @@ namespace Config {
     };
 
     enum eConfigManagerType : uint8_t {
-        CONFIG_LUA,
+        CONFIG_LEGACY = 0,
+        CONFIG_LUA
     };
 
     const char* typeToString(eConfigManagerType t);
@@ -57,7 +58,6 @@ namespace Config {
         virtual std::string                      getConfigString()   = 0;
         virtual const std::vector<std::string>&  getConfigPaths()    = 0;
 
-        virtual bool                             configLoaded()      = 0;
         virtual bool                             configVerifPassed() = 0;
 
         virtual std::string                      getErrors() = 0;
@@ -68,8 +68,6 @@ namespace Config {
 
         virtual std::expected<void, std::string> registerPluginValue(void* handle, SP<Config::Values::IValue> value) = 0;
         virtual void                             onPluginUnload(void* handle)                                        = 0;
-
-        virtual std::vector<std::string>         deprecationNotices() const = 0;
     };
 
     bool                initConfigManager();

@@ -4,7 +4,6 @@
 #include "macros.hpp"
 #include "../Framebuffer.hpp"
 #include <hyprgraphics/egl/Egl.hpp>
-#include <algorithm>
 #include <limits>
 
 using namespace Hyprgraphics::Egl;
@@ -15,7 +14,6 @@ CGLFramebuffer::CGLFramebuffer(const std::string& name) : IFramebuffer(name), m_
 
 bool CGLFramebuffer::internalAlloc(int w, int h, uint32_t drmFormat) {
     g_pHyprOpenGL->makeEGLCurrent();
-    CFramebufferBindingGuard bindings{g_pHyprOpenGL};
     m_tempBuf = false;
 
     if (!m_tex) {
@@ -36,14 +34,14 @@ bool CGLFramebuffer::internalAlloc(int w, int h, uint32_t drmFormat) {
     const auto format = getPixelFormatFromDRM(drmFormat);
     m_tex->bind();
     glTexImage2D(GL_TEXTURE_2D, 0, format->glInternalFormat ? format->glInternalFormat : format->glFormat, w, h, 0, format->glFormat, format->glType, nullptr);
-    g_pHyprOpenGL->bindFramebuffer(GL_FRAMEBUFFER, m_fb);
+    glBindFramebuffer(GL_FRAMEBUFFER, m_fb);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_tex->m_texID, 0);
 
     if (m_mirrorTex) {
         const auto format = getPixelFormatFromDRM(m_mirrorTex->m_drmFormat);
         m_mirrorTex->bind();
         glTexImage2D(GL_TEXTURE_2D, 0, format->glInternalFormat ? format->glInternalFormat : format->glFormat, w, h, 0, format->glFormat, format->glType, nullptr);
-        g_pHyprOpenGL->bindFramebuffer(GL_FRAMEBUFFER, m_fb);
+        glBindFramebuffer(GL_FRAMEBUFFER, m_fb);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, m_mirrorTex->m_texID, 0);
         GLenum drawBuffers[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
         glDrawBuffers(2, drawBuffers);
@@ -60,8 +58,7 @@ bool CGLFramebuffer::internalAlloc(int w, int h, uint32_t drmFormat) {
 
         glDisable(GL_DEPTH_TEST);
         glDepthMask(GL_FALSE);
-    } else
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, GL_NONE, 0);
+    }
 
     auto status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     RASSERT((status == GL_FRAMEBUFFER_COMPLETE), "Framebuffer incomplete, couldn't create! (FB status: {}, GL Error: 0x{:x})", status, sc<int>(glGetError()));
@@ -69,9 +66,16 @@ bool CGLFramebuffer::internalAlloc(int w, int h, uint32_t drmFormat) {
     if (m_stencilTex && m_stencilTex->ok())
         m_stencilTex->unbind();
 
-    LOG(Log::DEBUG, "Framebuffer \"{}\" created, status {}", m_name, status);
+    Log::logger->log(Log::DEBUG, "Framebuffer \"{}\" created, status {}", m_name, status);
 
     glBindTexture(GL_TEXTURE_2D, 0);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+
+    // this can run mid frame in enableMirror() in begin() restore the draw fb the renderer had bound
+    if (g_pHyprRenderer && g_pHyprRenderer->m_renderData.currentFB)
+        g_pHyprRenderer->m_renderData.currentFB->bind();
+    else
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
     return true;
 }
@@ -80,8 +84,7 @@ void CGLFramebuffer::addStencil(SP<ITexture> tex) {
     if (m_stencilTex == tex)
         return;
 
-    if (m_fbAllocated)
-        LOG(Log::DEBUG, "Attaching a stencil to an allocated fb, will need re-alloc to be applied.");
+    RASSERT(!m_fbAllocated, "Should add stencil tex prior to FB allocation")
     m_stencilTex = tex;
 }
 
@@ -90,38 +93,35 @@ void CGLFramebuffer::bind() {
     // that means its a temp buffer that we have to raw bind and not change the viewport.
     // the temp buffer code binds this fb to add attachments themself
     if (m_tempBuf) {
-        if (g_pHyprOpenGL)
-            g_pHyprOpenGL->bindFramebuffer(GL_FRAMEBUFFER, m_fb);
-        else
-            glBindFramebuffer(GL_FRAMEBUFFER, m_fb);
+        glBindFramebuffer(GL_FRAMEBUFFER, m_fb);
         return;
     }
 
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_fb);
     if (g_pHyprOpenGL) {
-        g_pHyprOpenGL->bindFramebuffer(GL_DRAW_FRAMEBUFFER, m_fb);
-        g_pHyprOpenGL->setViewport(0, 0, m_size.x, m_size.y);
-    } else {
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_fb);
+        const auto& size = g_pHyprRenderer->m_renderData.pMonitor ? g_pHyprRenderer->m_renderData.pMonitor->m_pixelSize : m_size;
+        g_pHyprOpenGL->setViewport(0, 0, size.x, size.y);
+    } else
         glViewport(0, 0, m_size.x, m_size.y);
-    }
 }
 
 void CGLFramebuffer::unbind() {
-    if (g_pHyprOpenGL)
-        g_pHyprOpenGL->bindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-    else
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 }
 
 void CGLFramebuffer::release() {
     if (m_fbAllocated) {
-        // Deletion detaches attachments without binding this framebuffer. Once the
-        // backend is gone, EGL teardown already owns the remaining GL resources.
-        if (g_pHyprOpenGL) {
-            g_pHyprOpenGL->makeEGLCurrent();
-            glDeleteFramebuffers(1, &m_fb);
-            g_pHyprOpenGL->onFramebufferDeleted(m_fb);
-        }
+        glBindFramebuffer(GL_FRAMEBUFFER, m_fb);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+        if (m_mirrorTex)
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, 0, 0);
+
+        glDeleteFramebuffers(1, &m_fb);
+
+        // releasing can happen mid frame from a temp fb, rebind the fb the renderer
+        // had previously bound, otherwise draws continue into fb 0 and raise GL_INVALID_FRAMEBUFFER_OPERATION
+        if (g_pHyprRenderer && g_pHyprRenderer->m_renderData.currentFB && g_pHyprRenderer->m_renderData.currentFB.get() != this)
+            g_pHyprRenderer->m_renderData.currentFB->bind();
 
         m_fbAllocated = false;
         m_fb          = 0;
@@ -136,19 +136,19 @@ void CGLFramebuffer::release() {
 bool CGLFramebuffer::readPixels(CHLBufferReference buffer, uint32_t offsetX, uint32_t offsetY, uint32_t width, uint32_t height) {
     auto shm = buffer->shm();
     if (!shm.success) {
-        LOG(Log::ERR, "Can't copy: buffer is not shm");
+        LOGM(Log::ERR, "Can't copy: buffer is not shm");
         return false;
     }
 
     auto [pixelData, fmt, bufLen] = buffer->beginDataPtr(0); // no need for end, cuz it's shm
     if (!pixelData) {
-        LOG(Log::ERR, "Can't copy: failed to get shm data pointer");
+        LOGM(Log::ERR, "Can't copy: failed to get shm data pointer");
         return false;
     }
 
     const auto PFORMAT = getPixelFormatFromDRM(shm.format);
     if (!PFORMAT) {
-        LOG(Log::ERR, "Can't copy: failed to find a pixel format");
+        LOGM(Log::ERR, "Can't copy: failed to find a pixel format");
         return false;
     }
 
@@ -158,19 +158,19 @@ bool CGLFramebuffer::readPixels(CHLBufferReference buffer, uint32_t offsetX, uin
     const auto readHeight = height > 0 ? height : fbHeight;
 
     if (readWidth == 0 || readHeight == 0 || shm.stride <= 0) {
-        LOG(Log::ERR, "Can't copy: invalid shm read dimensions");
+        LOGM(Log::ERR, "Can't copy: invalid shm read dimensions");
         return false;
     }
 
     if (offsetX > fbWidth || offsetY > fbHeight || readWidth > fbWidth - offsetX || readHeight > fbHeight - offsetY) {
-        LOG(Log::ERR, "Can't copy: read rect exceeds framebuffer");
+        LOGM(Log::ERR, "Can't copy: read rect exceeds framebuffer");
         return false;
     }
 
     const auto shmWidth  = sc<uint32_t>(shm.size.x);
     const auto shmHeight = sc<uint32_t>(shm.size.y);
     if (offsetX > shmWidth || offsetY > shmHeight || readWidth > shmWidth - offsetX || readHeight > shmHeight - offsetY) {
-        LOG(Log::ERR, "Can't copy: read rect exceeds shm buffer");
+        LOGM(Log::ERR, "Can't copy: read rect exceeds shm buffer");
         return false;
     }
 
@@ -179,31 +179,31 @@ bool CGLFramebuffer::readPixels(CHLBufferReference buffer, uint32_t offsetX, uin
     const auto rowBytes    = sc<size_t>(minStride(PFORMAT, readWidth));
 
     if (rowBytes == 0) {
-        LOG(Log::ERR, "Can't copy: invalid shm row size");
+        LOGM(Log::ERR, "Can't copy: invalid shm row size");
         return false;
     }
 
     if (rowOffset > std::numeric_limits<size_t>::max() - rowBytes || rowOffset + rowBytes > strideBytes) {
-        LOG(Log::ERR, "Can't copy: shm stride is too small");
+        LOGM(Log::ERR, "Can't copy: shm stride is too small");
         return false;
     }
 
     const auto lastRow = sc<size_t>(offsetY) + sc<size_t>(readHeight) - 1;
     if (strideBytes > 0 && lastRow > std::numeric_limits<size_t>::max() / strideBytes) {
-        LOG(Log::ERR, "Can't copy: shm row offset overflows");
+        LOGM(Log::ERR, "Can't copy: shm row offset overflows");
         return false;
     }
 
     const auto lastRowStart = lastRow * strideBytes;
     const auto rowEnd       = rowOffset + rowBytes;
     if (lastRowStart > std::numeric_limits<size_t>::max() - rowEnd || lastRowStart + rowEnd > bufLen) {
-        LOG(Log::ERR, "Can't copy: shm buffer is too small");
+        LOGM(Log::ERR, "Can't copy: shm buffer is too small");
         return false;
     }
 
     g_pHyprOpenGL->makeEGLCurrent();
-    CFramebufferBindingGuard bindings{g_pHyprOpenGL};
-    g_pHyprOpenGL->bindFramebuffer(GL_READ_FRAMEBUFFER, getFBID());
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, getFBID());
+    bind();
 
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
 
@@ -220,7 +220,7 @@ bool CGLFramebuffer::readPixels(CHLBufferReference buffer, uint32_t offsetX, uin
         else if (stripSwizzleAlpha(*PFORMAT->swizzle) == stripSwizzleAlpha(SWIZZLE_BGRA))
             glFormat = GL_BGRA_EXT;
         else {
-            LOG(Log::ERR, "Copied frame via shm might be broken or color flipped");
+            LOGM(Log::ERR, "Copied frame via shm might be broken or color flipped");
             glFormat = GL_RGBA;
         }
     } else if (glFormat == GL_RGBA)
@@ -237,8 +237,10 @@ bool CGLFramebuffer::readPixels(CHLBufferReference buffer, uint32_t offsetX, uin
         }
     }
 
+    unbind();
     glPixelStorei(GL_PACK_ALIGNMENT, 4);
 
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
     return true;
 }
 
@@ -254,13 +256,8 @@ void CGLFramebuffer::invalidate(const std::vector<GLenum>& attachments) {
     if (!isAllocated())
         return;
 
-    static const auto PFBINVALIDATE = CConfigValue<Config::INTEGER>("debug:invalidate_buffers");
-    if (*PFBINVALIDATE)
-        glInvalidateFramebuffer(GL_FRAMEBUFFER, attachments.size(), attachments.data());
-
-    // m_cleared tracks the color attachment only, see clearAfterInvalidation()
-    if (std::ranges::contains(attachments, sc<GLenum>(GL_COLOR_ATTACHMENT0)))
-        m_cleared = false;
+    glInvalidateFramebuffer(GL_FRAMEBUFFER, attachments.size(), attachments.data());
+    m_cleared = false;
 }
 
 void CGLFramebuffer::clearAfterInvalidation() {
@@ -269,6 +266,6 @@ void CGLFramebuffer::clearAfterInvalidation() {
 
     m_cleared = true;
     glClearColor(0, 0, 0, 0);
-    g_pHyprOpenGL->disableScissor();
+    g_pHyprOpenGL->scissor(nullptr);
     glClear(GL_COLOR_BUFFER_BIT);
 }

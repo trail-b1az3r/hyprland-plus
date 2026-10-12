@@ -38,7 +38,13 @@ TEST_CASE(solitaryClients) {
     }
 
     // FIXME: need a reliable client with solitary opaque surface in fullscreen. kitty doesn't work all the time
-    // SPAWN_KITTY("a");
+    // NLog::log("{}Spawning kittyProcA", Colors::YELLOW);
+    // auto kittyProcA = Tests::spawnKitty();
+
+    // if (!kittyProcA) {
+    //     NLog::log("{}Error: kitty did not spawn", Colors::RED);
+    //     return false;
+    // }
 
     // OK(getFromSocket("/eval hl.config({ general = { allow_tearing = true } })"));
     // OK(getFromSocket("/eval hl.config({ render = { direct_scanout = 1 } })"));

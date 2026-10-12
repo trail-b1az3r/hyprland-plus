@@ -1,7 +1,6 @@
 #include "InputManager.hpp"
 #include "../../Compositor.hpp"
 #include "../../desktop/state/FocusState.hpp"
-#include "../../desktop/view/types/AlphaModifiable.hpp"
 #include "../../protocols/IdleInhibit.hpp"
 #include "../../protocols/IdleNotify.hpp"
 #include "../../protocols/core/Compositor.hpp"
@@ -11,7 +10,7 @@ void CInputManager::newIdleInhibitor(std::any inhibitor) {
     const auto PINHIBIT = m_idleInhibitors.emplace_back(makeUnique<SIdleInhibitor>()).get();
     PINHIBIT->inhibitor = std::any_cast<SP<CIdleInhibitor>>(inhibitor);
 
-    LOG(Log::DEBUG, "New idle inhibitor registered for surface {:x}", rc<uintptr_t>(PINHIBIT->inhibitor->m_surface.get()));
+    Log::logger->log(Log::DEBUG, "New idle inhibitor registered for surface {:x}", rc<uintptr_t>(PINHIBIT->inhibitor->m_surface.get()));
 
     PINHIBIT->inhibitor->m_listeners.destroy = PINHIBIT->inhibitor->m_resource->m_events.destroy.listen([this, PINHIBIT] {
         std::erase_if(m_idleInhibitors, [PINHIBIT](const auto& other) { return other.get() == PINHIBIT; });
@@ -21,7 +20,7 @@ void CInputManager::newIdleInhibitor(std::any inhibitor) {
     auto WLSurface = Desktop::View::CWLSurface::fromResource(PINHIBIT->inhibitor->m_surface.lock());
 
     if (!WLSurface) {
-        LOG(Log::DEBUG, "Inhibitor has no HL Surface attached to it, likely meaning it's a non-desktop element. Assuming it's visible.");
+        Log::logger->log(Log::DEBUG, "Inhibitor has no HL Surface attached to it, likely meaning it's a non-desktop element. Assuming it's visible.");
         PINHIBIT->nonDesktop = true;
         recheckIdleInhibitorStatus();
         return;
@@ -46,9 +45,7 @@ void CInputManager::recheckIdleInhibitorStatus() {
         if (!WLSurface || !WLSurface->view())
             continue;
 
-        const auto VIEW          = WLSurface->view();
-        const auto ALPHAMODIFIER = dynamicPointerCast<Desktop::View::IAlphaModifiable>(VIEW);
-        if (VIEW->mapped() && VIEW->acceptsInput() && (!ALPHAMODIFIER || ALPHAMODIFIER->alphaNonZero())) {
+        if (WLSurface->view()->aliveAndVisible()) {
             PROTO::idle->setInhibit(true);
             return;
         }
@@ -73,7 +70,7 @@ bool CInputManager::isWindowInhibiting(const PHLWINDOW& w, bool onlyHl) {
         return true;
 
     if (w->m_ruleApplicator->idleInhibitMode().valueOrDefault() == Desktop::Rule::IDLEINHIBIT_FULLSCREEN && Fullscreen::controller()->isFullscreen(w) && w->m_workspace &&
-        w->m_workspace->visible())
+        w->m_workspace->isVisible())
         return true;
 
     if (onlyHl)
@@ -94,9 +91,7 @@ bool CInputManager::isWindowInhibiting(const PHLWINDOW& w, bool onlyHl) {
                 if (!WLSurface || !WLSurface->view())
                     return;
 
-                const auto VIEW          = WLSurface->view();
-                const auto ALPHAMODIFIER = dynamicPointerCast<Desktop::View::IAlphaModifiable>(VIEW);
-                if (VIEW->mapped() && VIEW->acceptsInput() && (!ALPHAMODIFIER || ALPHAMODIFIER->alphaNonZero()))
+                if (WLSurface->view()->aliveAndVisible())
                     *sc<bool*>(data) = true;
             },
             &isInhibiting);

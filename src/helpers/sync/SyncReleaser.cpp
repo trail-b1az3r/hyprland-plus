@@ -11,7 +11,7 @@ CSyncReleaser::CSyncReleaser(SP<CSyncTimeline> timeline, uint64_t point) : m_tim
 
 CSyncReleaser::~CSyncReleaser() {
     if (!m_timeline) {
-        LOG(Log::ERR, "CSyncReleaser destructing without a timeline");
+        Log::logger->log(Log::ERR, "CSyncReleaser destructing without a timeline");
         return;
     }
 
@@ -21,13 +21,11 @@ CSyncReleaser::~CSyncReleaser() {
         m_timeline->signal(m_point);
 }
 
-bool CSyncReleaser::addSyncFileFd(const Hyprutils::OS::CFileDescriptor& syncFd) {
-    auto fd = m_fd.isValid() ? DRM::mergeFence(m_fd, syncFd) : syncFd.duplicate();
-    if (!fd.isValid())
-        return false;
-
-    m_fd = std::move(fd);
-    return true;
+void CSyncReleaser::addSyncFileFd(const Hyprutils::OS::CFileDescriptor& syncFd) {
+    if (m_fd.isValid())
+        m_fd = DRM::mergeFence(m_fd, syncFd);
+    else
+        m_fd = syncFd.duplicate();
 }
 
 void CSyncReleaser::drop() {

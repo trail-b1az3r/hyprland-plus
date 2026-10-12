@@ -64,7 +64,7 @@ CFunctionHook::SInstructionProbe CFunctionHook::probeMinimumJumpSize(void* start
         auto probe = getInstructionLenAt(sc<uint8_t*>(start) + size);
         sizes.push_back(probe.len);
         size += probe.len;
-        instrs += std::format("{}\n", probe.assembly);
+        instrs += probe.assembly + "\n";
     }
 
     return {size, instrs, sizes};
@@ -150,7 +150,7 @@ bool CFunctionHook::hook() {
 
     if (g_pFunctionHookSystem->m_activeHooks.contains(rc<uint64_t>(m_source))) {
         // TODO: return actual error codes...
-        LOG(Log::ERR, "[functionhook] failed, function is already hooked");
+        Log::logger->log(Log::ERR, "[functionhook] failed, function is already hooked");
         return false;
     }
 
@@ -178,12 +178,12 @@ bool CFunctionHook::hook() {
     const auto PROBEFIXEDASM = fixInstructionProbeRIPCalls(probe);
 
     if (PROBEFIXEDASM.bytes.empty()) {
-        LOG(Log::ERR, "[functionhook] failed, unsupported asm / failed assembling:\n{}", probe.assembly);
+        Log::logger->log(Log::ERR, "[functionhook] failed, unsupported asm / failed assembling:\n{}", probe.assembly);
         return false;
     }
 
     if (std::abs(rc<int64_t>(m_source) - rc<int64_t>(m_landTrampolineAddr)) > 2000000000 /* 2 GB */) {
-        LOG(Log::ERR, "[functionhook] failed, source and trampo are over 2GB apart");
+        Log::logger->log(Log::ERR, "[functionhook] failed, source and trampo are over 2GB apart");
         return false;
     }
 
@@ -193,7 +193,7 @@ bool CFunctionHook::hook() {
     const auto   TRAMPOLINE_SIZE = sizeof(RELATIVE_JMP_ADDRESS) + HOOKSIZE;
 
     if (TRAMPOLINE_SIZE > MAX_TRAMPOLINE_SIZE) {
-        LOG(Log::ERR, "[functionhook] failed, not enough space in trampo to alloc:\n{}", probe.assembly);
+        Log::logger->log(Log::ERR, "[functionhook] failed, not enough space in trampo to alloc:\n{}", probe.assembly);
         return false;
     }
 
@@ -304,7 +304,7 @@ static uintptr_t seekNewPageAddr() {
 
         uint64_t start = 0, end = 0;
         if (props[0].empty()) {
-            LOG(Log::WARN, "seekNewPageAddr: unexpected line in self maps");
+            Log::logger->log(Log::WARN, "seekNewPageAddr: unexpected line in self maps");
             continue;
         }
 
@@ -314,11 +314,11 @@ static uintptr_t seekNewPageAddr() {
             start = std::stoull(startEnd[0], nullptr, 16);
             end   = std::stoull(startEnd[1], nullptr, 16);
         } catch (std::exception& e) {
-            LOG(Log::WARN, "seekNewPageAddr: unexpected line in self maps: {}", line);
+            Log::logger->log(Log::WARN, "seekNewPageAddr: unexpected line in self maps: {}", line);
             continue;
         }
 
-        LOG(Log::DEBUG, "seekNewPageAddr: page 0x{:x} - 0x{:x}", start, end);
+        Log::logger->log(Log::DEBUG, "seekNewPageAddr: page 0x{:x} - 0x{:x}", start, end);
 
         if (lastStart == 0) {
             lastStart = start;
@@ -327,17 +327,17 @@ static uintptr_t seekNewPageAddr() {
         }
 
         if (!anchoredToHyprland && line.contains("Hyprland")) {
-            LOG(Log::DEBUG, "seekNewPageAddr: Anchored to hyprland at 0x{:x}", start);
+            Log::logger->log(Log::DEBUG, "seekNewPageAddr: Anchored to hyprland at 0x{:x}", start);
             anchoredToHyprland = true;
         } else if (start - lastEnd > PAGESIZE_VAR * 2) {
             if (!anchoredToHyprland) {
-                LOG(Log::DEBUG, "seekNewPageAddr: skipping gap 0x{:x}-0x{:x}, not anchored to Hyprland code pages yet.", lastEnd, start);
+                Log::logger->log(Log::DEBUG, "seekNewPageAddr: skipping gap 0x{:x}-0x{:x}, not anchored to Hyprland code pages yet.", lastEnd, start);
                 lastStart = start;
                 lastEnd   = end;
                 continue;
             }
 
-            LOG(Log::DEBUG, "seekNewPageAddr: found gap: 0x{:x}-0x{:x} ({} bytes)", lastEnd, start, start - lastEnd);
+            Log::logger->log(Log::DEBUG, "seekNewPageAddr: found gap: 0x{:x}-0x{:x} ({} bytes)", lastEnd, start, start - lastEnd);
             MAPS.close();
             return lastEnd;
         }
@@ -369,7 +369,7 @@ uint64_t CHookSystem::getAddressForTrampo() {
 
     if (!page->addr) {
         // allocate it
-        LOG(Log::DEBUG, "getAddressForTrampo: Allocating new page for hooks");
+        Log::logger->log(Log::DEBUG, "getAddressForTrampo: Allocating new page for hooks");
         const uint64_t PAGESIZE_VAR = sysconf(_SC_PAGE_SIZE);
         const auto     BASEPAGEADDR = seekNewPageAddr();
         for (int attempt = 0; attempt < 2; ++attempt) {
@@ -380,7 +380,7 @@ uint64_t CHookSystem::getAddressForTrampo() {
                 page->len  = PAGESIZE_VAR;
                 page->used = 0;
 
-                LOG(Log::DEBUG, "Attempted to allocate 0x{:x}, got 0x{:x}", PAGEADDR, page->addr);
+                Log::logger->log(Log::DEBUG, "Attempted to allocate 0x{:x}, got 0x{:x}", PAGEADDR, page->addr);
 
                 if (page->addr == rc<uint64_t>(MAP_FAILED))
                     continue;
@@ -402,7 +402,7 @@ uint64_t CHookSystem::getAddressForTrampo() {
 
     page->used += HOOK_TRAMPOLINE_MAX_SIZE;
 
-    LOG(Log::DEBUG, "getAddressForTrampo: Returning addr 0x{:x} for page at 0x{:x}", ADDRFORCONSUMER, page->addr);
+    Log::logger->log(Log::DEBUG, "getAddressForTrampo: Returning addr 0x{:x} for page at 0x{:x}", ADDRFORCONSUMER, page->addr);
 
     return ADDRFORCONSUMER;
 }

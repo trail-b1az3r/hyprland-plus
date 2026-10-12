@@ -1,7 +1,6 @@
 #include "WindowAnimationController.hpp"
 
-#include "../window/Window.hpp"
-#include "../window/WindowPresentation.hpp"
+#include "../Window.hpp"
 #include "../../../output/Monitor.hpp"
 
 #include <algorithm>
@@ -163,7 +162,7 @@ Animation::SViewAnimationContext CWindowAnimationController::animateIn() const {
     ctx.alpha     = {.from = 0.F, .to = 1.F};
 
     // Do not apply movement anims to X11 ORs
-    if (!m_parent->backend().traits().suggestsNoBorder)
+    if (!m_parent->m_X11DoesntWantBorders)
         applyWindowStyle(ctx, m_parent, false);
 
     return ctx;
@@ -177,10 +176,10 @@ Animation::SViewAnimationContext CWindowAnimationController::animateOut() const 
     ctx.size.from = m_parent->size(Desktop::View::IGeometric::GEOMETRIC_CURRENT);
     ctx.size.to   = m_parent->size(Desktop::View::IGeometric::GEOMETRIC_GOAL);
 
-    ctx.alpha = {.from = m_parent->presentation().alpha(WINDOW_ALPHA_FADE)->value(), .to = 0.F};
+    ctx.alpha = {.from = m_parent->alpha(WINDOW_ALPHA_FADE)->value(), .to = 0.F};
 
     // Do not apply movement anims to X11 ORs
-    if (!m_parent->backend().traits().suggestsNoBorder)
+    if (!m_parent->m_X11DoesntWantBorders)
         applyWindowStyle(ctx, m_parent, true);
 
     return ctx;
@@ -189,9 +188,9 @@ Animation::SViewAnimationContext CWindowAnimationController::animateOut() const 
 void CWindowAnimationController::apply(const Animation::SViewAnimationContext& ctx) const {
     m_parent->positionAnimation()->setValueAndWarp(ctx.pos.from);
     m_parent->sizeAnimation()->setValueAndWarp(ctx.size.from);
-    m_parent->presentation().alpha(WINDOW_ALPHA_FADE)->setValueAndWarp(ctx.alpha.from);
+    m_parent->alpha(WINDOW_ALPHA_FADE)->setValueAndWarp(ctx.alpha.from);
 
     m_parent->move(ctx.pos.to);
     m_parent->resize(ctx.size.to);
-    *m_parent->presentation().alpha(WINDOW_ALPHA_FADE) = ctx.alpha.to;
+    *m_parent->alpha(WINDOW_ALPHA_FADE) = ctx.alpha.to;
 }

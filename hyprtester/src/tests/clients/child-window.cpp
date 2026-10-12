@@ -8,7 +8,6 @@
 #include <hyprutils/os/Process.hpp>
 
 #include <optional>
-#include <format>
 #include <sys/poll.h>
 #include <unistd.h>
 #include <csignal>
@@ -50,7 +49,7 @@ namespace {
 CClient::CClient() {
     NLog::log("{}Attempting to start child-window client", Colors::YELLOW);
 
-    this->proc = makeShared<CProcess>(std::format("{}/child-window", binaryDir), std::vector<std::string>{});
+    this->proc = makeShared<CProcess>(binaryDir + "/child-window", std::vector<std::string>{});
 
     this->proc->addEnv("WAYLAND_DISPLAY", WLDISPLAY);
 
@@ -128,7 +127,10 @@ TEST_CASE(childWindow) {
 
     // test that child windows (shouldBeFloated) are not auto-grouped
     NLog::log("{}Test child windows are not auto-grouped", Colors::GREEN);
-    SPAWN_KITTY("a");
+    auto kitty = Tests::spawnKitty();
+    if (!kitty) {
+        FAIL_TEST("Couldn't spawn kitty");
+    }
 
     // create group and enable auto-grouping
     OK(getFromSocket("/dispatch hl.dsp.group.toggle()"));

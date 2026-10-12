@@ -103,13 +103,15 @@ namespace Desktop::Rule {
         DEFINE_PROP(bool, noFocus, false, WINDOW_RULE_EFFECT_NO_FOCUS)
         DEFINE_PROP(bool, noMaxSize, false, WINDOW_RULE_EFFECT_NO_MAX_SIZE)
         DEFINE_PROP(bool, noShadow, false, WINDOW_RULE_EFFECT_NO_SHADOW)
-        DEFINE_PROP(bool, noGlow, false, WINDOW_RULE_EFFECT_NO_GLOW)
-        DEFINE_PROP(bool, noWobble, false, WINDOW_RULE_EFFECT_NO_WOBBLE)
         DEFINE_PROP(bool, noShortcutsInhibit, false, WINDOW_RULE_EFFECT_NO_SHORTCUTS_INHIBIT)
         DEFINE_PROP(bool, opaque, false, WINDOW_RULE_EFFECT_OPAQUE)
         DEFINE_PROP(bool, dimAround, false, WINDOW_RULE_EFFECT_DIM_AROUND)
         DEFINE_PROP(bool, RGBX, false, WINDOW_RULE_EFFECT_FORCE_RGBX)
         DEFINE_PROP(bool, syncFullscreen, true, WINDOW_RULE_EFFECT_SYNC_FULLSCREEN)
+        // A superposition window stays tiled, but is drawn above a fullscreen floating window instead of being hidden by it.
+        DEFINE_PROP(bool, superposition, false, WINDOW_RULE_EFFECT_SUPERPOSITION)
+        // A plustile window can be resized from each of its four edges with hl.dsp.window.resize_edge.
+        DEFINE_PROP(bool, plustile, false, WINDOW_RULE_EFFECT_PLUSTILE)
         DEFINE_PROP(bool, tearing, false, WINDOW_RULE_EFFECT_IMMEDIATE)
         DEFINE_PROP(bool, xray, false, WINDOW_RULE_EFFECT_XRAY)
         DEFINE_PROP(bool, renderUnfocused, false, WINDOW_RULE_EFFECT_RENDER_UNFOCUSED)
@@ -120,7 +122,6 @@ namespace Desktop::Rule {
         DEFINE_PROP(bool, persistentSize, false, WINDOW_RULE_EFFECT_PERSISTENT_SIZE)
         DEFINE_PROP(bool, stayFocused, false, WINDOW_RULE_EFFECT_STAY_FOCUSED)
         DEFINE_PROP(bool, confinePointer, false, WINDOW_RULE_EFFECT_CONFINE_POINTER)
-        DEFINE_PROP(bool, noXdgDrags, false, WINDOW_RULE_EFFECT_NO_XDG_DRAGS)
 
         DEFINE_PROP(int, idleInhibitMode, false, WINDOW_RULE_EFFECT_IDLE_INHIBIT)
 

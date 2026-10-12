@@ -1,6 +1,6 @@
 #include "WLSurface.hpp"
 #include "LayerSurface.hpp"
-#include "window/Window.hpp"
+#include "Window.hpp"
 #include "../../protocols/core/Compositor.hpp"
 #include "../../protocols/LayerShell.hpp"
 #include "../../protocols/FractionalScale.hpp"
@@ -41,28 +41,25 @@ SP<CWLSurfaceResource> CWLSurface::resource() const {
 }
 
 bool CWLSurface::small() const {
-    if (!m_view || m_view->type() != VIEW_TYPE_WINDOW || !exists())
+    if (!m_view || !m_view->aliveAndVisible() || m_view->type() != VIEW_TYPE_WINDOW || !exists())
         return false;
 
     if (!m_resource->m_current.texture)
         return false;
 
-    const auto O = dynamicPointerCast<CWindow>(m_view.lock());
-    if (!O || !O->mapped() || !O->acceptsInput() || !O->alphaNonZero())
-        return false;
-
-    const auto REPORTED_SIZE = O->backend().reportedSize();
+    const auto O             = dynamicPointerCast<CWindow>(m_view.lock());
+    const auto REPORTED_SIZE = O->getReportedSize();
 
     return REPORTED_SIZE.x > m_resource->m_current.size.x + 1 || REPORTED_SIZE.y > m_resource->m_current.size.y + 1;
 }
 
 Vector2D CWLSurface::correctSmallVec() const {
-    if (!m_view || m_view->type() != VIEW_TYPE_WINDOW || !exists() || !small() || !m_fillIgnoreSmall)
+    if (!m_view || !m_view->aliveAndVisible() || m_view->type() != VIEW_TYPE_WINDOW || !exists() || !small() || !m_fillIgnoreSmall)
         return {};
 
     const auto SIZE = getViewporterCorrectedSize();
     const auto O    = dynamicPointerCast<CWindow>(m_view.lock());
-    const auto REP  = O->backend().reportedSize();
+    const auto REP  = O->getReportedSize();
 
     return Vector2D{(REP.x - SIZE.x) / 2, (REP.y - SIZE.y) / 2}.clamp({}, {INFINITY, INFINITY}) * (O->size(Desktop::View::IGeometric::GEOMETRIC_CURRENT) / REP);
 }
@@ -84,55 +81,56 @@ Vector2D CWLSurface::getViewporterCorrectedSize() const {
     return m_resource->m_current.viewport.hasDestination ? m_resource->m_current.viewport.destination : m_resource->m_current.bufferSize;
 }
 
-CRegion CWLSurface::computeDamage(const std::optional<CBox>& box) const {
+CRegion CWLSurface::computeDamage() const {
     if (!m_resource->m_current.texture)
         return {};
+
+    CRegion damage = m_resource->m_current.accumulateBufferDamage();
+    damage.transform(Math::wlTransformToHyprutils(m_resource->m_current.transform), m_resource->m_current.bufferSize.x, m_resource->m_current.bufferSize.y);
 
     const auto BUFSIZE = m_resource->m_current.bufferSize;
     if (BUFSIZE.x <= 0 || BUFSIZE.y <= 0)
         return {};
+
+    const auto CORRECTVEC = correctSmallVecBuf();
+
+    if (m_resource->m_current.viewport.hasSource)
+        damage.intersect(m_resource->m_current.viewport.source);
 
     const auto SCALEDSRCSIZE =
         m_resource->m_current.viewport.hasSource ? m_resource->m_current.viewport.source.size() * m_resource->m_current.scale : m_resource->m_current.bufferSize;
     if (SCALEDSRCSIZE.x <= 0 || SCALEDSRCSIZE.y <= 0)
         return {};
 
+    damage.scale({BUFSIZE.x / SCALEDSRCSIZE.x, BUFSIZE.y / SCALEDSRCSIZE.y});
+    damage.translate(CORRECTVEC);
+
+    // go from buffer coords in the damage to hl logical
+
+    const auto BOX      = getSurfaceBoxGlobal();
     const auto SURFSIZE = m_resource->m_current.size;
     if (SURFSIZE.x <= 0 || SURFSIZE.y <= 0)
         return {};
 
-    std::optional<Vector2D> boxSize;
-    if (box.has_value()) {
-        boxSize = box->size();
+    const Vector2D SCALE = SURFSIZE / m_resource->m_current.bufferSize;
+
+    damage.scale(SCALE);
+    if (BOX.has_value()) {
+        auto boxSize = BOX->size();
 
         if (m_view->type() == VIEW_TYPE_WINDOW) {
             const auto WINDOW = dynamicPointerCast<CWindow>(m_view.lock());
             if (!WINDOW)
                 return {};
 
-            boxSize = WINDOW->backend().surfaceLocalToBuffer(boxSize.value());
+            boxSize = boxSize * WINDOW->m_X11SurfaceScaledBy;
         }
 
-        if (boxSize->x <= 0 || boxSize->y <= 0)
+        if (boxSize.x <= 0 || boxSize.y <= 0)
             return {};
+
+        damage.intersect(CBox{{}, boxSize});
     }
-
-    const auto CORRECTVEC = correctSmallVecBuf();
-
-    CRegion    damage = m_resource->m_current.accumulateBufferDamage();
-    damage.transform(Math::wlTransformToHyprutils(m_resource->m_current.transform), BUFSIZE.x, BUFSIZE.y);
-
-    if (m_resource->m_current.viewport.hasSource)
-        damage.intersect(m_resource->m_current.viewport.source);
-
-    damage.scale({BUFSIZE.x / SCALEDSRCSIZE.x, BUFSIZE.y / SCALEDSRCSIZE.y});
-    damage.translate(CORRECTVEC);
-
-    // go from buffer coords in the damage to hl logical
-    damage.scale(SURFSIZE / BUFSIZE);
-
-    if (boxSize)
-        damage.intersect(CBox{{}, boxSize.value()});
 
     return damage;
 }
@@ -155,7 +153,7 @@ void CWLSurface::destroy() {
 
     m_resource.reset();
 
-    LOG(Log::DEBUG, "CWLSurface {:x} called destroy()", rc<uintptr_t>(this));
+    Log::logger->log(Log::DEBUG, "CWLSurface {:x} called destroy()", rc<uintptr_t>(this));
 }
 
 void CWLSurface::init() {
@@ -168,7 +166,7 @@ void CWLSurface::init() {
 
     m_listeners.destroy = m_resource->m_events.destroy.listen([this] { destroy(); });
 
-    LOG(Log::DEBUG, "CWLSurface {:x} called init()", rc<uintptr_t>(this));
+    Log::logger->log(Log::DEBUG, "CWLSurface {:x} called init()", rc<uintptr_t>(this));
 }
 
 SP<IView> CWLSurface::view() const {
@@ -176,7 +174,7 @@ SP<IView> CWLSurface::view() const {
 }
 
 bool CWLSurface::desktopComponent() const {
-    return !!m_view;
+    return m_view && m_view->visible();
 }
 
 std::optional<CBox> CWLSurface::getSurfaceBoxGlobal() const {
@@ -206,7 +204,7 @@ bool CWLSurface::keyboardFocusable() const {
     if (m_view->type() == VIEW_TYPE_WINDOW || m_view->type() == VIEW_TYPE_SUBSURFACE || m_view->type() == VIEW_TYPE_POPUP)
         return true;
     if (const auto LS = CLayerSurface::fromView(m_view.lock()); LS && LS->m_layerSurface)
-        return LS->m_layerSurface->m_current.keyboardInteractivity != ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE;
+        return LS->m_layerSurface->m_current.interactivity != ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE;
     return false;
 }
 

@@ -26,13 +26,13 @@
 #include "../../../desktop/rule/windowRule/WindowRule.hpp"
 #include "../../../desktop/rule/windowRule/WindowRuleEffectContainer.hpp"
 #include "../../../layout/LayoutManager.hpp"
-#include "../../../keybinds/Resolver.hpp"
 #include "../../../layout/supplementary/WorkspaceAlgoMatcher.hpp"
 #include "../../../animation/AnimationManager.hpp"
 #include "../../../managers/input/InputManager.hpp"
 #include "../../../managers/input/trackpad/TrackpadGestures.hpp"
 #include "../../../managers/input/trackpad/gestures/CloseGesture.hpp"
 #include "../../../managers/input/trackpad/gestures/CursorZoomGesture.hpp"
+#include "../../../managers/input/trackpad/gestures/DispatcherGesture.hpp"
 #include "../../../managers/input/trackpad/gestures/FloatGesture.hpp"
 #include "../../../managers/input/trackpad/gestures/FullscreenGesture.hpp"
 #include "../../../managers/input/trackpad/gestures/LuaFunctionGesture.hpp"
@@ -355,20 +355,15 @@ static int hlCurve(lua_State* L) {
         {
             CScopeGuard x([L] { lua_pop(L, 1); });
 
-            lua_getfield(L, 2, "damping");
-            if (lua_isnil(L, -1)) {
-                lua_pop(L, 1);
-                // Old typo form, please add a deprecation notice if you ever plan on removing these
-                lua_getfield(L, 2, "dampening");
-            }
+            lua_getfield(L, 2, "dampening");
 
             if (!lua_isnumber(L, -1))
-                return Internal::configError(L, std::format("hl.curve(\"{}\"): damping expects a number", name));
+                return Internal::configError(L, std::format("hl.curve(\"{}\"): dampening expects a number", name));
 
             curve.damping = lua_tonumber(L, -1);
 
             if (curve.damping <= 0.5F)
-                return Internal::configError(L, std::format("hl.curve(\"{}\"): damping expects a number >= 0.5", name));
+                return Internal::configError(L, std::format("hl.curve(\"{}\"): dampening expects a number >= 0.5", name));
         }
 
         {
@@ -453,7 +448,7 @@ static int hlAnimation(lua_State* L) {
         if (!Animation::mgr()->springExists(springName))
             return Internal::configError(L, std::format(R"(hl.animation("{}"): no such spring "{}")", leaf, springName));
 
-        curveName = std::format("spring:{}", springName);
+        curveName = "spring:" + springName;
     } else
         return Internal::configError(L, std::format(R"(hl.animation("{}"): bezier or spring is required)", leaf));
 
@@ -527,9 +522,9 @@ static int hlEnv(lua_State* L) {
     if (dbus) {
         std::string CMD;
 #ifdef USES_SYSTEMD
-        CMD = std::format("systemctl --user import-environment '{}' && hash dbus-update-activation-environment 2>/dev/null && ", name);
+        CMD = "systemctl --user import-environment '" + name + "' && hash dbus-update-activation-environment 2>/dev/null && ";
 #endif
-        CMD += std::format("dbus-update-activation-environment --systemd '{}'", name);
+        CMD += "dbus-update-activation-environment --systemd '" + name + "'";
         if (mgr->isFirstLaunch())
             Config::Supplementary::executor()->addExecOnce({CMD, false});
         else
@@ -651,8 +646,12 @@ static int hlWorkspaceRule(lua_State* L) {
         enabled = lua_toboolean(L, -1) != 0;
     lua_pop(L, 1);
 
+    const auto& [wsId, wsName, isAutoID] = getWorkspaceIDNameFromString(wsStr);
+
     Config::CWorkspaceRule wsRule;
     wsRule.m_workspaceString = wsStr;
+    wsRule.m_workspaceName   = wsName;
+    wsRule.m_workspaceId     = isAutoID ? WORKSPACE_INVALID : wsId;
     wsRule.setEnabled(enabled);
 
     lua_pushnil(L);
@@ -878,7 +877,7 @@ static int hlGesture(lua_State* L) {
 
 #undef GET_ACTION_STRING
 
-    Input::ModifierMask modMask = Input::HL_MODIFIER_NONE;
+    uint32_t modMask = 0;
     lua_getfield(L, 1, "mods");
     if (!lua_isnil(L, -1)) {
         CLuaConfigString modsParser("");
@@ -887,26 +886,20 @@ static int hlGesture(lua_State* L) {
             lua_pop(L, 1);
             return Internal::configError(L, std::format("hl.gesture: field \"mods\": {}", modsErr.message));
         }
-        modMask = Keybinds::modMaskFromString(modsParser.parsed());
+        modMask = g_pKeybindManager->stringToModMask(modsParser.parsed());
     }
     lua_pop(L, 1);
 
     float deltaScale = 1.F;
     lua_getfield(L, 1, "scale");
     if (!lua_isnil(L, -1)) {
-        CLuaConfigFloat scaleParser(1.F, -10.F, 10.F);
+        CLuaConfigFloat scaleParser(1.F, 0.1F, 10.F);
         auto            scaleErr = scaleParser.parse(L);
         if (scaleErr.errorCode != PARSE_ERROR_OK) {
             lua_pop(L, 1);
             return Internal::configError(L, std::format("hl.gesture: field \"scale\": {}", scaleErr.message));
         }
         deltaScale = scaleParser.parsed();
-        // must be [-10.F, -0.1F] ∪ [0.1F, 10.F]
-        // < -10 and >10 checks are made above
-        if (deltaScale > -0.1F && deltaScale < 0.1F) {
-            lua_pop(L, 1);
-            return Internal::configError(L, "hl.gesture: field \"scale\": value must be between -10 and -0.1 or between 0.1 and 10 - It's currently: {}", deltaScale);
-        }
     }
     lua_pop(L, 1);
 

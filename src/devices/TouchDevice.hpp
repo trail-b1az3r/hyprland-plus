@@ -6,7 +6,7 @@ class CTouchDevice : public ITouch {
   public:
     static SP<CTouchDevice>        create(SP<Aquamarine::ITouch> touch);
 
-    virtual bool                   isVirtual() const;
+    virtual bool                   isVirtual();
     virtual SP<Aquamarine::ITouch> aq();
 
   private:

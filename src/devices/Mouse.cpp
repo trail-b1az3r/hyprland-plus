@@ -39,8 +39,6 @@ CMouse::CMouse(SP<Aquamarine::IPointer> mouse_) : m_mouse(mouse_) {
             .timeMs   = event.timeMs,
             .absolute = event.absolute,
             .device   = m_self.lock(),
-            .output   = event.output,
-            .mouse    = true,
         });
     });
 
@@ -130,7 +128,7 @@ CMouse::CMouse(SP<Aquamarine::IPointer> mouse_) : m_mouse(mouse_) {
     m_deviceName = m_mouse->getName();
 }
 
-bool CMouse::isVirtual() const {
+bool CMouse::isVirtual() {
     return false;
 }
 

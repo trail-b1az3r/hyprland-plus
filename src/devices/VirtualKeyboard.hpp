@@ -8,7 +8,7 @@ class CVirtualKeyboard : public IKeyboard {
   public:
     static SP<CVirtualKeyboard>       create(SP<CVirtualKeyboardV1Resource> keeb);
 
-    virtual bool                      isVirtual() const;
+    virtual bool                      isVirtual();
     virtual SP<Aquamarine::IKeyboard> aq();
 
     virtual wl_client*                getClient();

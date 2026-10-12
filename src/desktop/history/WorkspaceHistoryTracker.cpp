@@ -1,11 +1,13 @@
 #include "WorkspaceHistoryTracker.hpp"
 
 #include "../../output/Monitor.hpp"
-#include "../../workspace/HLWorkspace.hpp"
+#include "../Workspace.hpp"
 #include "../state/FocusState.hpp"
 #include "../../managers/eventLoop/EventLoopManager.hpp"
 #include "../../event/EventBus.hpp"
 #include "../../config/ConfigValue.hpp"
+
+#include <hyprutils/utils/ScopeGuard.hpp>
 
 #include <ranges>
 
@@ -44,11 +46,9 @@ void CWorkspaceHistoryTracker::track(PHLWORKSPACE ws) {
     std::erase_if(m_history, [&](const auto& entry) { return entry.workspace == ws; });
 
     // Push the newly focused workspace to the top of our MRU list
-    m_history.push_front(SHistoryEntry{
-        .workspace = ws,
-        .monitor   = ws->m_monitor,
-        .target    = {.id = ws->id(), .address = ws->addressableName(), .displayName = ws->displayName(), .type = ws->type()},
-    });
+    m_history.push_front(SHistoryEntry{.workspace = ws, .monitor = ws->m_monitor, .name = ws->m_name, .id = ws->m_id});
+
+    Hyprutils::Utils::CScopeGuard x([&] { setLastWorkspaceData(ws); });
 }
 
 void CWorkspaceHistoryTracker::gc() {
@@ -75,7 +75,16 @@ const CWorkspaceHistoryTracker::SHistoryEntry CWorkspaceHistoryTracker::previous
         return *std::next(it);
 
     // No prior history found
-    return {};
+    return SHistoryEntry{.id = WORKSPACE_INVALID};
+}
+
+SWorkspaceIDName CWorkspaceHistoryTracker::previousWorkspaceIDName(PHLWORKSPACE ws) {
+    const auto DATA = previousWorkspace(ws);
+
+    if (DATA.id == WORKSPACE_INVALID)
+        return SWorkspaceIDName{.id = WORKSPACE_INVALID};
+
+    return SWorkspaceIDName{.id = DATA.id, .name = DATA.name, .isAutoIDd = DATA.id <= 0};
 }
 
 const CWorkspaceHistoryTracker::SHistoryEntry CWorkspaceHistoryTracker::previousWorkspace(PHLWORKSPACE ws, PHLMONITOR restrict) {
@@ -101,22 +110,25 @@ const CWorkspaceHistoryTracker::SHistoryEntry CWorkspaceHistoryTracker::previous
     }
 
     // Entry not found
-    return {};
+    return SHistoryEntry{.id = WORKSPACE_INVALID};
 }
 
-void CWorkspaceHistoryTracker::workspaceIdentityChanged(PHLWORKSPACE workspace) {
-    if (!workspace)
+SWorkspaceIDName CWorkspaceHistoryTracker::previousWorkspaceIDName(PHLWORKSPACE ws, PHLMONITOR restrict) {
+    const auto DATA = previousWorkspace(ws, restrict);
+    if (DATA.id == WORKSPACE_INVALID)
+        return SWorkspaceIDName{.id = WORKSPACE_INVALID};
+
+    return SWorkspaceIDName{.id = DATA.id, .name = DATA.name, .isAutoIDd = DATA.id <= 0};
+}
+
+void CWorkspaceHistoryTracker::setLastWorkspaceData(PHLWORKSPACE w) {
+    if (!w) {
+        m_lastWorkspaceData = {};
         return;
-
-    for (auto& entry : m_history) {
-        if (entry.workspace != workspace)
-            continue;
-
-        entry.target = {
-            .id          = workspace->id(),
-            .address     = workspace->addressableName(),
-            .displayName = workspace->displayName(),
-            .type        = workspace->type(),
-        };
     }
+
+    m_lastWorkspaceData.workspace     = w;
+    m_lastWorkspaceData.workspaceID   = w->m_id;
+    m_lastWorkspaceData.workspaceName = w->m_name;
+    m_lastWorkspaceData.monitor       = w->m_monitor;
 }

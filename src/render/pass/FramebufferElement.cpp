@@ -4,14 +4,14 @@ CFramebufferElement::CFramebufferElement(const CFramebufferElement::SFramebuffer
     ;
 }
 
-bool CFramebufferElement::needsLiveBlur(Render::CRenderContext& ctx) {
+bool CFramebufferElement::needsLiveBlur() {
     return false;
 }
 
-bool CFramebufferElement::needsPrecomputeBlur(Render::CRenderContext& ctx) {
+bool CFramebufferElement::needsPrecomputeBlur() {
     return false;
 }
 
-bool CFramebufferElement::undiscardable(Render::CRenderContext& ctx) {
+bool CFramebufferElement::undiscardable() {
     return true;
 }

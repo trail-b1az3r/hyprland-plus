@@ -84,7 +84,7 @@ in
 
       hyprland-hidpi = builtins.trace ''
         hyprland-hidpi was removed. Please use the hyprland package.
-        For more information, refer to https://wiki.hypr.land/configuring/extra/xwayland/.
+        For more information, refer to https://wiki.hypr.land/Configuring/XWayland.
       '' final.hyprland;
     };
 

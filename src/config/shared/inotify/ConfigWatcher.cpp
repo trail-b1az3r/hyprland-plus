@@ -20,7 +20,7 @@ UP<CConfigWatcher>& Config::watcher() {
 
 CConfigWatcher::CConfigWatcher() : m_inotifyFd(inotify_init1(IN_NONBLOCK | IN_CLOEXEC)) {
     if (!m_inotifyFd.isValid()) {
-        LOG(Log::ERR, "CConfigWatcher couldn't open an inotify node. Config will not be automatically reloaded");
+        Log::logger->log(Log::ERR, "CConfigWatcher couldn't open an inotify node. Config will not be automatically reloaded");
         return;
     }
 }
@@ -88,19 +88,19 @@ void CConfigWatcher::onInotifyEvent() {
         const auto* ev = rc<const inotify_event*>(buffer.data() + offset);
 
         if (offset + sizeof(inotify_event) > sc<size_t>(bytesRead)) {
-            LOG(Log::ERR, "CConfigWatcher: malformed inotify event, truncated header");
+            Log::logger->log(Log::ERR, "CConfigWatcher: malformed inotify event, truncated header");
             break;
         }
 
         if (offset + sizeof(inotify_event) + ev->len > sc<size_t>(bytesRead)) {
-            LOG(Log::ERR, "CConfigWatcher: malformed inotify event, truncated name field");
+            Log::logger->log(Log::ERR, "CConfigWatcher: malformed inotify event, truncated name field");
             break;
         }
 
         const auto WD = std::ranges::find_if(m_watches, [wd = ev->wd](const auto& e) { return e.wd == wd; });
 
         if (WD == m_watches.end())
-            LOG(Log::ERR, "CConfigWatcher: got an event for wd {} which we don't have?!", ev->wd);
+            Log::logger->log(Log::ERR, "CConfigWatcher: got an event for wd {} which we don't have?!", ev->wd);
         else
             m_watchCallback(SConfigWatchEvent{
                 .file = WD->file,

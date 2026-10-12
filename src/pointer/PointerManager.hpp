@@ -1,9 +1,5 @@
 #pragma once
 
-namespace Render {
-    class CRenderContext;
-}
-
 #include "../devices/IPointer.hpp"
 #include "../devices/ITouch.hpp"
 #include "../devices/Tablet.hpp"
@@ -13,9 +9,7 @@ namespace Render {
 #include "../helpers/sync/SyncTimeline.hpp"
 #include "../helpers/time/Time.hpp"
 #include "../helpers/signal/Signal.hpp"
-#include <cairo/cairo.h>
 #include <tuple>
-#include <vector>
 
 class IHID;
 namespace Render {
@@ -23,7 +17,6 @@ namespace Render {
 }
 
 AQUAMARINE_FORWARD(IBuffer);
-AQUAMARINE_FORWARD(IOutput);
 
 /*
     The naming here is a bit confusing.
@@ -33,8 +26,6 @@ AQUAMARINE_FORWARD(IOutput);
 */
 
 namespace Pointer {
-
-    class CPointerTransformer;
 
     class CPointerManager {
       public:
@@ -51,7 +42,7 @@ namespace Pointer {
         // only clamps to the layout.
         void warpTo(const Vector2D& logical);
         void move(const Vector2D& deltaLogical);
-        void warpAbsolute(Vector2D abs, SP<IHID> dev, WP<Aquamarine::IOutput> output = {});
+        void warpAbsolute(Vector2D abs, SP<IHID> dev);
 
         void setCursorBuffer(SP<Aquamarine::IBuffer> buf, const Vector2D& hotspot, const float& scale);
         void setCursorSurface(SP<Desktop::View::CWLSurface> buf, const Vector2D& hotspot);
@@ -64,8 +55,8 @@ namespace Pointer {
         bool softwareLockedFor(PHLMONITOR pMonitor);
         bool hasVisibleHWCursor(PHLMONITOR pMonitor);
 
-        void renderSoftwareCursorsFor(Render::CRenderContext& ctx, PHLMONITOR pMonitor, const Time::steady_tp& now, CRegion& damage /* logical */,
-                                      std::optional<Vector2D> overridePos = {} /* monitor-local */, bool screencopy = false, bool forceRender = false);
+        void renderSoftwareCursorsFor(PHLMONITOR pMonitor, const Time::steady_tp& now, CRegion& damage /* logical */, std::optional<Vector2D> overridePos = {} /* monitor-local */,
+                                      bool screencopy = false, bool forceRender = false);
 
         // this is needed e.g. during screensharing where
         // the software cursors aren't locked during the cursor move, but they
@@ -74,43 +65,27 @@ namespace Pointer {
 
         //
         Vector2D position();
-        Vector2D untransformedPosition() const;
         Vector2D hotspot();
         Vector2D cursorSizeLogical();
-
-        void     addTransformer(const SP<CPointerTransformer>& transformer);
-        void     removeTransformer(const SP<CPointerTransformer>& transformer);
-        bool     hasTransformers() const;
 
         void     recheckEnteredOutputs();
 
         // returns the thing in global coords
         CBox getCursorBoxGlobal();
 
-        struct SCursorImageData {
-            SP<Aquamarine::IBuffer> pBuffer;
-            SP<Render::ITexture>    bufferTex;
-
-            Vector2D                hotspot; // logical
-            Vector2D                size;    // pixels
-            float                   scale = 1.F;
-
-            Vector2D                logicalSize() const;
-            CBox                    logicalBox(const Vector2D& pointerPos) const;
-            Vector2D                outputSize(float outputScale) const;
-            Vector2D                planeSize(float outputScale, wl_output_transform transform) const;
-            Vector2D                planeHotspot(float outputScale, wl_output_transform transform, const Vector2D& planeSize) const;
-            cairo_matrix_t          cairoMatrix(const Vector2D& textureSize, float outputScale, wl_output_transform transform, const Vector2D& planeSize) const;
-        };
-
-        struct SCursorImage : SCursorImageData {
+        struct SCursorImage {
+            SP<Aquamarine::IBuffer>       pBuffer;
+            SP<Render::ITexture>          bufferTex;
             WP<Desktop::View::CWLSurface> surface;
+
+            Vector2D                      hotspot;
+            Vector2D                      size;
+            float                         scale = 1.F;
+
             CHyprSignalListener           destroySurface;
             CHyprSignalListener           commitSurface;
         };
 
-        // One image per output scale; the highest scale is the representative for monitor-independent APIs.
-        void                 setCursorBuffers(const std::vector<SCursorImageData>& images);
         const SCursorImage&  currentCursorImage();
         SP<Render::ITexture> getCurrentCursorTexture();
 
@@ -124,7 +99,6 @@ namespace Pointer {
         void onMonitorDisconnect();
         void updateCursorBackend();
         void onCursorMoved();
-        void applyPendingTransformerMutations();
         bool hasCursor();
         void damageIfSoftware();
 
@@ -134,11 +108,9 @@ namespace Pointer {
         // returns the thing in device coordinates. Is NOT offset by the hotspot, relies on set_cursor with hotspot.
         Vector2D getCursorPosForMonitor(PHLMONITOR pMonitor);
         // returns the thing in logical coordinates of the monitor
-        CBox                 getCursorBoxLogicalForMonitor(PHLMONITOR pMonitor);
+        CBox     getCursorBoxLogicalForMonitor(PHLMONITOR pMonitor);
 
-        Vector2D             transformedHotspot(PHLMONITOR pMonitor);
-        SCursorImageData&    cursorImageForMonitor(PHLMONITOR pMonitor);
-        SP<Render::ITexture> cursorTextureForImage(SCursorImageData& image);
+        Vector2D transformedHotspot(PHLMONITOR pMonitor);
 
         struct SPointerListener {
             CHyprSignalListener destroy;
@@ -190,11 +162,9 @@ namespace Pointer {
             std::vector<CBox> monitorBoxes;
         } m_currentMonitorLayout;
 
-        SCursorImage m_currentCursorImage;
-        // The representative lives only in m_currentCursorImage, including its texture cache.
-        std::vector<SCursorImageData> m_cursorImages;
+        SCursorImage m_currentCursorImage; // TODO: support various sizes per-output so we can have pixel-perfect cursors
 
-        Vector2D                      m_pointerPos = {0, 0};
+        Vector2D     m_pointerPos = {0, 0};
 
         struct SMonitorPointerState {
             SMonitorPointerState(const PHLMONITOR& m) : monitor(m) {}
@@ -220,15 +190,6 @@ namespace Pointer {
         bool                                  attemptHardwareCursor(SP<SMonitorPointerState> state);
         SP<Aquamarine::IBuffer>               renderHWCursorBuffer(SP<SMonitorPointerState> state, SP<Render::ITexture> texture);
         bool                                  setHWCursorBuffer(SP<SMonitorPointerState> state, SP<Aquamarine::IBuffer> buf);
-
-        struct STransformerMutation {
-            SP<CPointerTransformer> transformer;
-            bool                    add = false;
-        };
-
-        std::vector<SP<CPointerTransformer>> m_transformers;
-        std::vector<STransformerMutation>    m_pendingTransformerMutations;
-        size_t                               m_transformDepth = 0;
 
         struct {
             CHyprSignalListener monitorAdded;

@@ -1,4 +1,6 @@
 #include <re2/re2.h>
+#include <array>
+#include <string_view>
 
 #include <cctype>
 #include <cerrno>
@@ -36,12 +38,6 @@ using namespace Hyprutils::Memory;
 
 #include <readline/readline.h>
 #include <readline/history.h>
-
-#define LUA_ERRSYNTAX 3
-#define LUA_EOFMARK   "<eof>"
-
-#define xstr(a) str(a)
-#define str(a)  #a
 
 std::string instanceSignature;
 bool        quiet = false;
@@ -87,10 +83,12 @@ static int getUID() {
 std::string getRuntimeDir() {
     const auto XDG = getenv("XDG_RUNTIME_DIR");
 
-    if (!XDG)
-        return std::format("/run/user/{}/hypr", getUID());
+    if (!XDG) {
+        const std::string USERID = std::to_string(getUID());
+        return "/run/user/" + USERID + "/hypr";
+    }
 
-    return std::format("{}/hypr", XDG);
+    return std::string{XDG} + "/hypr";
 }
 
 static std::optional<uint64_t> toUInt64(const std::string_view str) {
@@ -202,7 +200,7 @@ int rollingRead(const int socket) {
     return 0;
 }
 
-int request(std::string_view arg, int minArgs = 0, bool needRoll = false, bool isRepl = false) {
+int request(std::string_view arg, int minArgs = 0, bool needRoll = false) {
     const auto SERVERSOCKET = socket(AF_UNIX, SOCK_STREAM, 0);
 
     if (SERVERSOCKET < 0) {
@@ -231,12 +229,12 @@ int request(std::string_view arg, int minArgs = 0, bool needRoll = false, bool i
     sockaddr_un serverAddress = {0};
     serverAddress.sun_family  = AF_UNIX;
 
-    std::string socketPath = std::format("{}/{}/.socket.sock", getRuntimeDir(), instanceSignature);
+    std::string socketPath = getRuntimeDir() + "/" + instanceSignature + "/.socket.sock";
 
     strncpy(serverAddress.sun_path, socketPath.c_str(), sizeof(serverAddress.sun_path) - 1);
 
     if (connect(SERVERSOCKET, rc<sockaddr*>(&serverAddress), SUN_LEN(&serverAddress)) < 0) {
-        log(std::format("Couldn't connect to {}. (4)", socketPath));
+        log("Couldn't connect to " + socketPath + ". (4)");
         return 4;
     }
 
@@ -276,11 +274,7 @@ int request(std::string_view arg, int minArgs = 0, bool needRoll = false, bool i
 
     close(SERVERSOCKET);
 
-    // lua interactive REPL: check for incomplete-line error
-    if (isRepl && reply.starts_with("error: " xstr(LUA_ERRSYNTAX) " ") && reply.ends_with(LUA_EOFMARK))
-        return 8;
-    else
-        log(reply);
+    log(reply);
 
     if (reply.starts_with("error:"))
         return 7;
@@ -304,12 +298,12 @@ int requestIPC(std::string_view filename, std::string_view arg) {
     sockaddr_un serverAddress = {0};
     serverAddress.sun_family  = AF_UNIX;
 
-    std::string socketPath = std::format("{}/{}/{}", getRuntimeDir(), instanceSignature, filename);
+    std::string socketPath = getRuntimeDir() + "/" + instanceSignature + "/" + filename;
 
     strncpy(serverAddress.sun_path, socketPath.c_str(), sizeof(serverAddress.sun_path) - 1);
 
     if (connect(SERVERSOCKET, rc<sockaddr*>(&serverAddress), SUN_LEN(&serverAddress)) < 0) {
-        log(std::format("Couldn't connect to {}. (3)", socketPath));
+        log("Couldn't connect to " + socketPath + ". (3)");
         return 3;
     }
 
@@ -352,7 +346,7 @@ void batchRequest(std::string_view arg, bool json) {
         commands.insert(0, "j/");
     }
 
-    std::string rq = std::format("[[BATCH]]{}", commands);
+    std::string rq = "[[BATCH]]" + commands;
     request(rq);
 }
 
@@ -383,7 +377,7 @@ void instancesRequest(bool json) {
         result += "\n]";
     }
 
-    log(std::format("{}\n", result));
+    log(result + "\n");
 }
 
 std::vector<std::string> splitArgs(int argc, char** argv) {
@@ -395,6 +389,435 @@ std::vector<std::string> splitArgs(int argc, char** argv) {
     return result;
 }
 
+// Single-quotes a string for sh.
+static std::string shellQuote(const std::string& s) {
+    std::string out = "'";
+    for (const char c : s) {
+        if (c == '\'')
+            out += "'\\''";
+        else
+            out += c;
+    }
+    return out + "'";
+}
+
+// Where saves and the dots history live. Under sudo these are those of the user who ran sudo ($SUDO_USER), not root's.
+struct SSaveEnv {
+    std::string home;
+    std::string user;    // the user sudo ran for, or ""
+    std::string state;   // ~/.local/state/halcyon
+    std::string saves;   // ~/.local/share/halcyon/saves
+    std::string history; // ~/.local/state/halcyon/dots-history: one save path per line, latest last
+};
+
+static SSaveEnv saveEnv() {
+    SSaveEnv    env;
+    const char* SUDO_USER = std::getenv("SUDO_USER");
+    env.user              = SUDO_USER ? SUDO_USER : "";
+
+    if (!env.user.empty()) {
+        if (const struct passwd* pw = getpwnam(env.user.c_str()); pw && pw->pw_dir)
+            env.home = pw->pw_dir;
+    }
+    if (env.home.empty()) {
+        const char* HOME_DIR = std::getenv("HOME");
+        env.home             = HOME_DIR ? HOME_DIR : "";
+    }
+
+    const char* XDG_STATE = env.user.empty() ? std::getenv("XDG_STATE_HOME") : nullptr;
+    env.state             = (XDG_STATE ? std::string(XDG_STATE) : env.home + "/.local/state") + "/halcyon";
+    env.saves             = env.home + "/.local/share/halcyon/saves";
+    env.history           = env.state + "/dots-history";
+    return env;
+}
+
+// Shell variables for the saves folder and the history, and the folder for them.
+static std::string historyVarsScript(const SSaveEnv& env) {
+    return "SAVES=" + shellQuote(env.saves) + "\n" + "HIST=" + shellQuote(env.history) + "\n" + "mkdir -p \"$SAVES\" \"$(dirname \"$HIST\")\"\n";
+}
+
+// Before a switch, when no switch is on record yet: store the Halcyon desktop being replaced, so "load -a" can go back to it.
+static std::string seedHistoryLine() {
+    return "if [ ! -s \"$HIST\" ]; then SEED=halcyon-before-$(date +%Y%m%d-%H%M%S); "
+           "hyprctl store -n \"$SEED\" && printf 'save\\t%s\\n' \"$SAVES/$SEED.dhyprsave\" >> \"$HIST\" || "
+           "echo 'Could not save the current dots, so load -a cannot go back to them.'; fi\n";
+}
+
+// After a switch: store the dots it switched to, and record them as the latest on the history.
+static std::string recordSwitchLine(const std::string& label) {
+    return "AUTO=auto-" + label +
+        "-$(date +%Y%m%d-%H%M%S); "
+        "hyprctl store -n \"$AUTO\" && printf 'save\\t%s\\n' \"$SAVES/$AUTO.dhyprsave\" >> \"$HIST\" || "
+        "echo 'Could not save the new dots, so load -a cannot go back to them.'\n";
+}
+
+// The dotfile sets `hyprctl dots <set> --install` can install. Each one is cloned as it is upstream and nothing in the
+// clone is edited. The entries it provides are backed up to ~/.local/state/halcyon/backups, then its own installer runs.
+// Every set replaces the desktop's config in ~/.config, so `hyprctl dots plus --install` brings Halcyon back.
+struct SDotSet {
+    std::string_view name;  // the name hyprctl takes
+    std::string_view alias; // a second name, or ""
+    std::string_view title;
+    std::string_view url;        // the upstream repository, cloned shallow
+    std::string_view configDir;  // folder in the repository whose entries go to ~/.config
+    std::string_view binDir;     // folder in the repository whose entries go to ~/.local/bin, or ""
+    std::string_view install;    // shell command run after the backup, in the clone ($DIR)
+    bool             clearFirst; // remove the entries after backing them up, instead of copying over them
+    std::string_view note;
+};
+
+static const std::array<SDotSet, 4> DOT_SETS = {{
+    {
+        .name       = "jakoolit",
+        .alias      = "hyprland-dots",
+        .title      = "JaKooLit Hyprland-Dots",
+        .url        = "https://github.com/JaKooLit/Hyprland-Dots",
+        .configDir  = "config",
+        .binDir     = "",
+        .install    = "cd \"$DIR\" && chmod +x copy.sh && ./copy.sh",
+        .clearFirst = false,
+        .note       = "Its copy.sh asks questions in the terminal and makes its own backups. The repository says it was archived "
+                      "in March 2026 and is now maintained at https://github.com/LinuxBeginnings/Hyprland-Dots.",
+    },
+    {
+        .name       = "mlfw",
+        .alias      = "ml4w",
+        .title      = "ML4W OS (mylinuxforwork/dotfiles)",
+        .url        = "https://github.com/mylinuxforwork/dotfiles",
+        .configDir  = "dotfiles/.config",
+        .binDir     = "",
+        .install    = "curl -fsSL https://ml4w.com/os/stable -o \"$ROOT/ml4w-install.sh\" && bash \"$ROOT/ml4w-install.sh\"",
+        .clearFirst = false,
+        .note       = "The installer is ML4W's own, from ml4w.com as its docs say. It installs packages and asks questions in the "
+                      "terminal. To read it first: curl -fsSL https://ml4w.com/os/stable | less",
+    },
+    {
+        .name       = "gdots",
+        .alias      = "gdot",
+        .title      = "gdots (semi710/gdots)",
+        .url        = "https://github.com/semi710/gdots",
+        .configDir  = ".config",
+        .binDir     = "bin",
+        .install    = "mkdir -p \"$HOME/.config\" \"$HOME/.local/bin\" && cp -a \"$DIR/.config/.\" \"$HOME/.config/\" && "
+                      "cp -a \"$DIR/bin/.\" \"$HOME/.local/bin/\"",
+        .clearFirst = true,
+        .note       = "Copied rather than stowed, so Halcyon's installer never writes into the clone. It does not install the "
+                      "packages its README lists (pywal16, waybar, hyprlock and others).",
+    },
+    {
+        .name       = "ii",
+        .alias      = "illogical-impulse",
+        .title      = "illogical-impulse (end-4/dots-hyprland)",
+        .url        = "https://github.com/end-4/dots-hyprland",
+        .configDir  = "dots/.config",
+        .binDir     = "",
+        .install    = "git -C \"$DIR\" submodule update --init --recursive && cd \"$DIR\" && ./setup install",
+        .clearFirst = false,
+        .note       = "The base of Halcyon: end-4's own installer, run from its clone. It installs the packages, asks questions "
+                      "in the terminal and backs up its own files. Read it first with: git clone --depth 1 "
+                      "https://github.com/end-4/dots-hyprland && less dots-hyprland/setup",
+    },
+}};
+
+// The shell script `hyprctl dots <set> --install` runs: fetch or update the clone, back up what the set would replace,
+// optionally clear it, then run the set's install.
+static std::string dotSetScript(const SDotSet& set) {
+    const std::string NAME = std::string(set.name);
+    std::string       s;
+    s += "set -e\n";
+    s += "ROOT=\"$HOME/.local/share/halcyon/dotsets\"\n";
+    s += "DIR=\"$ROOT/" + NAME + "\"\n";
+    s += "STATE=\"${XDG_STATE_HOME:-$HOME/.local/state}/halcyon\"\n";
+    s += "command -v git >/dev/null 2>&1 || { echo 'git is needed to fetch the dotfiles. Install it, then run this again.'; exit 1; }\n";
+    s += "mkdir -p \"$ROOT\"\n";
+    s += "if [ -d \"$DIR/.git\" ]; then git -C \"$DIR\" pull --ff-only; else git clone --depth 1 " + shellQuote(std::string(set.url)) + " \"$DIR\"; fi\n";
+    s += historyVarsScript(saveEnv());
+    s += seedHistoryLine();
+    s += "BK=\"$STATE/backups/" + NAME + "-$(date +%Y%m%d-%H%M%S)\"\n";
+    s += "mkdir -p \"$BK/config\" \"$BK/bin\"\n";
+    s += "entries() { find \"$1\" -mindepth 1 -maxdepth 1 -printf '%f\\n'; }\n";
+    s += "entries \"$DIR/" + std::string(set.configDir) +
+        "\" | while IFS= read -r n; do "
+        "if [ -e \"$HOME/.config/$n\" ] || [ -L \"$HOME/.config/$n\" ]; then cp -a \"$HOME/.config/$n\" \"$BK/config/\"; fi; done\n";
+    if (!set.binDir.empty()) {
+        s += "entries \"$DIR/" + std::string(set.binDir) +
+            "\" | while IFS= read -r n; do "
+            "if [ -e \"$HOME/.local/bin/$n\" ] || [ -L \"$HOME/.local/bin/$n\" ]; then cp -a \"$HOME/.local/bin/$n\" \"$BK/bin/\"; fi; done\n";
+    }
+    if (set.clearFirst) {
+        s += "entries \"$DIR/" + std::string(set.configDir) + "\" | while IFS= read -r n; do rm -rf \"$HOME/.config/$n\"; done\n";
+        if (!set.binDir.empty())
+            s += "entries \"$DIR/" + std::string(set.binDir) + "\" | while IFS= read -r n; do rm -rf \"$HOME/.local/bin/$n\"; done\n";
+    }
+    s += std::string(set.install) + "\n";
+    s += recordSwitchLine(NAME);
+    s += "echo\n";
+    s += "echo \"Installed " + std::string(set.title) + ". Your previous settings are in $BK\"\n";
+    s += "echo \"To go back to Halcyon, run: hyprctl dots plus --install\"\n";
+    return s;
+}
+
+static int dotsUsage() {
+    std::println("usage: hyprctl dots [plus | ii | jakoolit | mlfw | gdots] [--install]");
+    std::println("  hyprctl dots                 list the sets");
+    std::println("  hyprctl dots <set>           describe what installing it would do");
+    std::println("  hyprctl dots <set> --install clone it, back up the config it replaces, and install it (run in a terminal)");
+    return 1;
+}
+
+static int dotsList() {
+    std::println("hyprctl dots plus [--install]     Halcyon, from its dots checkout (hyprland-plus is already installed)");
+    for (const auto& set : DOT_SETS)
+        std::println("hyprctl dots {} [--install]{}{}", set.name, std::string(set.name).size() < 9 ? "     " : "  ", set.title);
+    return 0;
+}
+
+static int describeDotSet(const SDotSet& set) {
+    std::println("{}", set.title);
+    std::println("  from:     {}", set.url);
+    std::println("  clone:    ~/.local/share/halcyon/dotsets/{} (not edited)", set.name);
+    std::println("  backup:   the entries it provides, to ~/.local/state/halcyon/backups/{}-<time>", set.name);
+    std::println("  install:  {}", set.install);
+    std::println("  {}", set.note);
+    std::println("This replaces the Halcyon config in ~/.config. \"hyprctl dots plus --install\" brings Halcyon back.");
+    std::println("Run \"hyprctl dots {} --install\" in a terminal to install it.", set.name);
+    return 0;
+}
+
+static int runDotSet(const SDotSet& set, bool install) {
+    if (!install)
+        return describeDotSet(set);
+
+    const std::string SCRIPT = dotSetScript(set);
+    execl("/bin/sh", "sh", "-c", SCRIPT.c_str(), static_cast<char*>(nullptr));
+    std::println("could not start the install: {}", std::strerror(errno));
+    return 1;
+}
+
+// hyprctl dots plus [--install]: the Halcyon dots, from the checkout the dots installer recorded in
+// ~/.local/state/halcyon/repo. "plus" means hyprland-plus is already installed, so the dots installer
+// does not build it again. --install runs the dots installer non-interactively (setup install --force).
+static int runPlus(int argc) {
+    const char*       XDG_STATE  = std::getenv("XDG_STATE_HOME");
+    const char*       HOME_DIR   = std::getenv("HOME");
+    const std::string STATE_HOME = XDG_STATE ? std::string(XDG_STATE) : std::string(HOME_DIR ? HOME_DIR : "") + "/.local/state";
+    const std::string REPO_FILE  = STATE_HOME + "/halcyon/repo";
+
+    std::ifstream     repoStream(REPO_FILE);
+    std::string       repo;
+    if (!repoStream || !std::getline(repoStream, repo) || repo.empty()) {
+        std::println("The Halcyon dots are not set up yet. Run ./setup install in the dots repository first.");
+        return 1;
+    }
+
+    if (argc == 3) {
+        std::println("hyprland-plus is installed. Halcyon dots checkout: {}", repo);
+        return 0;
+    }
+
+    const SSaveEnv    ENV = saveEnv();
+    const std::string CMD = historyVarsScript(ENV) + seedHistoryLine() + "cd " + shellQuote(repo) + " || exit 1\nHALCYON_SKIP_HYPRLAND_PLUS=1 ./setup install --force || exit 1\n" +
+        recordSwitchLine("plus");
+    execl("/bin/sh", "sh", "-c", CMD.c_str(), static_cast<char*>(nullptr));
+    std::println("could not start the dots installer: {}", std::strerror(errno));
+    return 1;
+}
+
+// hyprctl dots [plus | <set>] [--install]: see dotsUsage().
+static int runDotsCommand(int argc, char** argv) {
+    const std::string_view NAME    = argc >= 3 ? std::string_view{argv[2]} : std::string_view{};
+    const bool             INSTALL = argc == 4 && std::string_view{argv[3]} == "--install";
+    if (argc > 4 || (argc == 4 && !INSTALL))
+        return dotsUsage();
+
+    if (NAME.empty())
+        return dotsList();
+
+    if (NAME == "plus")
+        return runPlus(argc);
+
+    for (const auto& set : DOT_SETS) {
+        if (NAME == set.name || (!set.alias.empty() && NAME == set.alias))
+            return runDotSet(set, INSTALL);
+    }
+
+    std::println("unknown dots set: {}", NAME);
+    return dotsUsage();
+}
+
+// ---- Saves: hyprctl store and hyprctl load ----
+//
+// A save is a gzipped tar named <name>.dhyprsave, kept in ~/.local/share/halcyon/saves. It holds the dot files: every
+// top-level entry of ~/.config that a dot set installs (the Halcyon checkout's, and each clone's), as they are now. It
+// also holds the .local files the config refers to, only in .local/bin, the fonts, icons and themes folders, and the
+// Halcyon state files theme.lua and placement.lua. manifest.txt inside says what is in it.
+//
+// The switches (a dot set install, or a load) record their result in the history. "load -a" loads the save before the
+// latest one, so running it again goes back.
+
+// Sets ENTRIES to the top-level entries of ~/.config that any dot set installs.
+static std::string dotEntriesScript() {
+    std::string s = "ENTRIES=$( {\n"
+                    "  if [ -s \"$REPO_FILE\" ]; then find \"$(cat \"$REPO_FILE\")/dots/.config\" -mindepth 1 -maxdepth 1 -printf '%f\\n' 2>/dev/null || true; fi\n";
+    for (const auto& set : DOT_SETS)
+        s += "  find \"$HOME/.local/share/halcyon/dotsets/" + std::string(set.name) + "/" + std::string(set.configDir) +
+            "\" -mindepth 1 -maxdepth 1 -printf '%f\\n' 2>/dev/null || true\n";
+    s += "} | sort -u )\n";
+    return s;
+}
+
+// The shell variables every save script starts with.
+static std::string savePrelude(const SSaveEnv& env) {
+    return "set -e\n" + std::string("HOME=") + shellQuote(env.home) + "\n" + "STATE=" + shellQuote(env.state) + "\n" + "REPO_FILE=\"$STATE/repo\"\n" +
+        "SUDO_USER=" + shellQuote(env.user) + "\n" + historyVarsScript(env);
+}
+
+static std::string storeScript(const SSaveEnv& env, const std::string& name) {
+    std::string s = savePrelude(env);
+    s += "NAME=" + shellQuote(name) + "\n";
+    s += "OUT=\"$SAVES/$NAME.dhyprsave\"\n";
+    s += dotEntriesScript();
+    s += "STAGE=$(mktemp -d)\n";
+    s += "REFS=$(mktemp)\n";
+    s += "trap 'rm -rf \"$STAGE\" \"$REFS\"' EXIT\n";
+    s += "mkdir -p \"$STAGE/.config\" \"$STAGE/.local\"\n";
+    // The dot files, as they are now.
+    s += "printf '%s\\n' \"$ENTRIES\" | while IFS= read -r n; do\n"
+         "  if [ -n \"$n\" ] && [ -e \"$HOME/.config/$n\" ]; then cp -a \"$HOME/.config/$n\" \"$STAGE/.config/\"; fi\n"
+         "done\n";
+    // The .local files the config refers to, and the ones that are always used with it.
+    s += "grep -rhoaE '\\.local/[A-Za-z0-9_./-]+' \"$STAGE/.config\" 2>/dev/null | sed 's|[./]*$||' | sort -u > \"$REFS\" || true\n";
+    s += "(cd \"$HOME\" && find .local/share/fonts -mindepth 1 -maxdepth 1 -name 'illogical-impulse-*' 2>/dev/null) >> \"$REFS\" || true\n";
+    s += "printf '%s\\n' .local/state/halcyon/theme.lua .local/state/halcyon/placement.lua >> \"$REFS\"\n";
+    s += "while IFS= read -r p; do\n"
+         "  case \"$p\" in\n"
+         "    .local/bin/*|.local/share/fonts/*|.local/share/icons/*|.local/share/themes/*|.local/state/halcyon/theme.lua|.local/state/halcyon/placement.lua) ;;\n"
+         "    *) continue ;;\n"
+         "  esac\n"
+         "  if [ -e \"$HOME/$p\" ] || [ -L \"$HOME/$p\" ]; then mkdir -p \"$STAGE/$(dirname \"$p\")\"; cp -a \"$HOME/$p\" \"$STAGE/$p\"; fi\n"
+         "done < \"$REFS\"\n";
+    s += "{ echo 'dhyprsave 1'; echo \"created $(date '+%Y-%m-%d %H:%M')\"; echo 'config:'; ls -1 \"$STAGE/.config\"; "
+         "echo 'local:'; (cd \"$STAGE\" && find .local -type f -o -type l); } > \"$STAGE/manifest.txt\"\n";
+    s += "tar -C \"$STAGE\" -czf \"$OUT\" .\n";
+    s += "echo \"Saved $NAME to $OUT\"\n";
+    return s;
+}
+
+// Restores the save in ARCHIVE. chooseArchive is the shell line that sets ARCHIVE. The files the save replaces are
+// backed up to ~/.local/state/halcyon/backups/before-load-<time> first.
+static std::string loadScript(const SSaveEnv& env, const std::string& chooseArchive) {
+    std::string s = savePrelude(env) + chooseArchive;
+    s += "[ -f \"$ARCHIVE\" ] || { echo \"No save at $ARCHIVE\"; exit 1; }\n";
+    s += "STAGE=$(mktemp -d)\n";
+    s += "trap 'rm -rf \"$STAGE\"' EXIT\n";
+    s += "tar -xzf \"$ARCHIVE\" -C \"$STAGE\"\n";
+    s += "[ -f \"$STAGE/manifest.txt\" ] || { echo \"$ARCHIVE is not a save (no manifest.txt)\"; exit 1; }\n";
+    s += "BK=\"$STATE/backups/before-load-$(date +%Y%m%d-%H%M%S)-$$\"\n";
+    s += "mkdir -p \"$BK\"\n";
+    // What the save replaces: whole top-level entries of ~/.config, and the individual .local files it holds.
+    s += "{ (cd \"$STAGE\" && find .config -mindepth 1 -maxdepth 1); (cd \"$STAGE\" && find .local -type f -o -type l); } > \"$STAGE/.replace\"\n";
+    s += "while IFS= read -r p; do\n"
+         "  if [ -e \"$HOME/$p\" ] || [ -L \"$HOME/$p\" ]; then mkdir -p \"$BK/$(dirname \"$p\")\"; cp -a \"$HOME/$p\" \"$BK/$p\"; fi\n"
+         "done < \"$STAGE/.replace\"\n";
+    s += "while IFS= read -r p; do\n"
+         "  if [ -e \"$STAGE/$p\" ] || [ -L \"$STAGE/$p\" ]; then\n"
+         "    case \"$p\" in\n"
+         "      .config/*) rm -rf \"$HOME/$p\" ;;\n"
+         "      *) rm -f \"$HOME/$p\" ;;\n"
+         "    esac\n"
+         "    mkdir -p \"$HOME/$(dirname \"$p\")\"; cp -a \"$STAGE/$p\" \"$HOME/$p\"\n"
+         "  fi\n"
+         "done < \"$STAGE/.replace\"\n";
+    // Under sudo the files go back to the user who ran it, including the saves and the history.
+    s += "if [ -n \"$SUDO_USER\" ]; then\n"
+         "  while IFS= read -r p; do\n"
+         "    if [ -e \"$HOME/$p\" ]; then chown -R \"$SUDO_USER\" \"$HOME/$p\"; fi\n"
+         "  done < \"$STAGE/.replace\"\n"
+         "  chown -R \"$SUDO_USER\" \"$SAVES\" \"$STATE\"\n"
+         "fi\n";
+    s += "printf 'save\\t%s\\n' \"$ARCHIVE\" >> \"$HIST\"\n";
+    s += "echo \"Loaded $(basename \"$ARCHIVE\" .dhyprsave). The files it replaced are in $BK\"\n";
+    s += "if [ -n \"$HYPRLAND_INSTANCE_SIGNATURE\" ]; then hyprctl reload >/dev/null 2>&1 || true; "
+         "else echo 'Run hyprctl reload, or restart Hyprland, to apply it.'; fi\n";
+    return s;
+}
+
+// The ARCHIVE line for "load -a": the save before the latest one on the history.
+static std::string previousArchiveLine() {
+    return "COUNT=$(cat \"$HIST\" 2>/dev/null | wc -l | tr -d ' ')\n"
+           "if [ \"$COUNT\" -lt 2 ]; then echo 'There is no earlier dots save to load yet. A dots switch records one.'; exit 1; fi\n"
+           "ARCHIVE=$(tail -n 2 \"$HIST\" | head -n 1 | cut -f2)\n";
+}
+
+static std::string listScript(const SSaveEnv& env) {
+    std::string s = savePrelude(env);
+    s += "ACTIVE=$(tail -n 1 \"$HIST\" 2>/dev/null | cut -f2)\n";
+    s += "found=0\n";
+    s += "for f in \"$SAVES\"/*.dhyprsave; do\n"
+         "  [ -e \"$f\" ] || continue\n"
+         "  found=1\n"
+         "  mark=''\n"
+         "  if [ \"$f\" = \"$ACTIVE\" ]; then mark='  (active)'; fi\n"
+         "  printf '%-32s %6s  %s%s\\n' \"$(basename \"$f\" .dhyprsave)\" \"$(du -h \"$f\" | cut -f1)\" \"$(date -r \"$f\" '+%Y-%m-%d %H:%M')\" \"$mark\"\n"
+         "done\n";
+    s += "if [ \"$found\" = 0 ]; then echo 'No saves yet. Make one with: hyprctl store -n <name>'; fi\n";
+    return s;
+}
+
+// Save names are file names: letters, digits, '.', '_' and '-', not starting with '.'.
+static bool validSaveName(const std::string& name) {
+    if (name.empty() || name.front() == '.')
+        return false;
+    return std::ranges::all_of(name, [](unsigned char c) { return std::isalnum(c) || c == '.' || c == '_' || c == '-'; });
+}
+
+static int runShell(const std::string& script) {
+    execl("/bin/sh", "sh", "-c", script.c_str(), static_cast<char*>(nullptr));
+    std::println("could not start the save script: {}", std::strerror(errno));
+    return 1;
+}
+
+static int saveUsage() {
+    std::println("usage: hyprctl store -n <name>        save the dot files as <name>.dhyprsave");
+    std::println("       hyprctl load -l                list the saves");
+    std::println("       hyprctl load -a                load the save before the latest switch");
+    std::println("       hyprctl load -n <name>         load a save");
+    return 1;
+}
+
+// hyprctl store -n <name>
+static int runStore(int argc, char** argv) {
+    if (argc != 4 || std::string_view{argv[2]} != "-n")
+        return saveUsage();
+
+    const std::string NAME = argv[3];
+    if (!validSaveName(NAME)) {
+        std::println("save names use letters, digits, '.', '_' and '-'");
+        return 1;
+    }
+    return runShell(storeScript(saveEnv(), NAME));
+}
+
+// hyprctl load -l | -a | -n <name>
+static int runLoad(int argc, char** argv) {
+    const SSaveEnv         env = saveEnv();
+    const std::string_view OPT = argc >= 3 ? std::string_view{argv[2]} : std::string_view{};
+
+    if (argc == 3 && OPT == "-l")
+        return runShell(listScript(env));
+    if (argc == 3 && OPT == "-a")
+        return runShell(loadScript(env, previousArchiveLine()));
+    if (argc == 4 && OPT == "-n") {
+        const std::string NAME = argv[3];
+        if (!validSaveName(NAME)) {
+            std::println("save names use letters, digits, '.', '_' and '-'");
+            return 1;
+        }
+        return runShell(loadScript(env, "ARCHIVE=" + shellQuote(env.saves + "/" + NAME + ".dhyprsave") + "\n"));
+    }
+    return saveUsage();
+}
+
 int main(int argc, char** argv) {
     bool parseArgs = true;
 
@@ -402,6 +825,13 @@ int main(int argc, char** argv) {
         std::println("{}", USAGE);
         return 1;
     }
+
+    if (std::string_view{argv[1]} == "dots")
+        return runDotsCommand(argc, argv);
+    if (std::string_view{argv[1]} == "store")
+        return runStore(argc, argv);
+    if (std::string_view{argv[1]} == "load")
+        return runLoad(argc, argv);
 
     std::string fullRequest      = "";
     std::string fullArgs         = "";
@@ -475,7 +905,7 @@ int main(int argc, char** argv) {
             continue;
         }
 
-        fullRequest += std::format("{} ", ARGS[i]);
+        fullRequest += ARGS[i] + " ";
     }
 
     if (fullRequest.empty()) {
@@ -485,7 +915,7 @@ int main(int argc, char** argv) {
 
     fullRequest.pop_back(); // remove trailing space
 
-    fullRequest = std::format("{}/{}", fullArgs, fullRequest);
+    fullRequest = fullArgs + "/" + fullRequest;
 
     // instances is HIS-independent
     if (fullRequest.contains("/instances")) {
@@ -566,33 +996,20 @@ int main(int argc, char** argv) {
         std::println("{}", USAGE);
     else if (fullRequest.contains("/rollinglog") && needRoll)
         exitStatus = request(fullRequest, 0, true);
-    else if (auto pos = fullRequest.find("/repl"); pos != std::string::npos) {
-        if (fullRequest.length() > pos + 5) {
+    else if (fullRequest.contains("/repl")) {
+        if (ARGS.size() > 1) {
             // single command with output
             exitStatus = request(fullRequest, 1);
         } else {
             // interactive REPL mode
-            char*       input      = nullptr;
-            bool        continuing = false;
-            std::string line;
-            while ((input = readline(continuing ? ">> " : "> ")) != nullptr) {
-                // extend line if incomplete, replace otherwise
-                if (continuing) {
-                    line.append("\n");
-                    line.append(input);
-                } else
-                    line.assign(input);
-                free(input);
+            char* input = nullptr;
+            while ((input = readline("> ")) != nullptr) {
+                std::string line(input);
                 if (!line.empty()) {
-                    exitStatus = request(std::format("/repl {}", line), 0, false, true);
-                    // check for incomplete-line error, retry
-                    if (exitStatus == 8)
-                        continuing = true;
-                    else {
-                        continuing = false;
-                        add_history(line.c_str());
-                    }
+                    exitStatus = request("/repl " + line);
+                    add_history(input);
                 }
+                free(input);
             }
         }
     } else {

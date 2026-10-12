@@ -1,9 +1,5 @@
 #pragma once
 
-namespace Render {
-    class CRenderContext;
-}
-
 #include <vector>
 #include "../../helpers/memory/Memory.hpp"
 #include "../../protocols/types/Buffer.hpp"
@@ -17,10 +13,10 @@ class CWLPointerResource;
 
 namespace Screenshare {
     enum eScreenshareType : uint8_t {
-        SHARE_NONE,
         SHARE_MONITOR,
         SHARE_WINDOW,
         SHARE_REGION,
+        SHARE_NONE
     };
 
     enum eScreenshareError : uint8_t {
@@ -50,7 +46,6 @@ namespace Screenshare {
         UP<CScreenshareFrame> nextFrame(bool overlayCursor);
         void                  stop();
         bool                  isActive();
-        bool                  isStale();
 
         // constraints
         const std::vector<DRMFormat>& allowedFormats() const;
@@ -85,7 +80,6 @@ namespace Screenshare {
 
         SP<CEventLoopTimer>      m_shareStopTimer;
         bool                     m_sharing = false;
-        bool                     m_stale   = false;
 
         struct {
             CHyprSignalListener monitorDestroyed;
@@ -151,7 +145,7 @@ namespace Screenshare {
         } m_listeners;
 
         bool copy();
-        void render(Render::CRenderContext& ctx);
+        void render();
         void calculateConstraints();
 
         friend class CScreenshareFrame;
@@ -189,10 +183,10 @@ namespace Screenshare {
         bool copyDmabuf();
         bool copyShm();
 
-        void render(Render::CRenderContext& ctx);
-        void renderMonitor(Render::CRenderContext& ctx);
-        void renderMonitorRegion(Render::CRenderContext& ctx);
-        void renderWindow(Render::CRenderContext& ctx);
+        void render();
+        void renderMonitor();
+        void renderMonitorRegion();
+        void renderWindow();
 
         void storeTempFB();
 
@@ -212,7 +206,6 @@ namespace Screenshare {
             uint32_t regionSessions       = 0;
             uint32_t pendingMonitorFrames = 0;
             uint32_t pendingRegionFrames  = 0;
-            uint32_t pendingWindowFrames  = 0;
 
             bool     needsCopyFB() const {
                 return pendingFrames > 0;
@@ -231,7 +224,6 @@ namespace Screenshare {
 
         void                    onOutputCommit(PHLMONITOR monitor);
         bool                    isOutputBeingSSd(PHLMONITOR monitor);
-        bool                    isOutputDSBlocked(PHLMONITOR monitor);
         bool                    outputNeedsCopyFB(PHLMONITOR monitor);
         SOutputCopyFBState      outputCopyFBState(PHLMONITOR monitor);
 
@@ -256,7 +248,7 @@ namespace Screenshare {
     inline UP<CScreenshareManager>& mgr() {
         static UP<CScreenshareManager> manager = nullptr;
         if (!manager && g_pHyprRenderer) {
-            LOG(Log::DEBUG, "Starting ScreenshareManager");
+            Log::logger->log(Log::DEBUG, "Starting ScreenshareManager");
             manager = makeUnique<CScreenshareManager>();
         }
         return manager;
