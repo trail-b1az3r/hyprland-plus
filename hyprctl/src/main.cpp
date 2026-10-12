@@ -401,6 +401,56 @@ static std::string shellQuote(const std::string& s) {
     return out + "'";
 }
 
+// Where saves and the dots history live. Under sudo these are those of the user who ran sudo ($SUDO_USER), not root's.
+struct SSaveEnv {
+    std::string home;
+    std::string user;    // the user sudo ran for, or ""
+    std::string state;   // ~/.local/state/halcyon
+    std::string saves;   // ~/.local/share/halcyon/saves
+    std::string history; // ~/.local/state/halcyon/dots-history: one save path per line, latest last
+};
+
+static SSaveEnv saveEnv() {
+    SSaveEnv    env;
+    const char* SUDO_USER = std::getenv("SUDO_USER");
+    env.user              = SUDO_USER ? SUDO_USER : "";
+
+    if (!env.user.empty()) {
+        if (const struct passwd* pw = getpwnam(env.user.c_str()); pw && pw->pw_dir)
+            env.home = pw->pw_dir;
+    }
+    if (env.home.empty()) {
+        const char* HOME_DIR = std::getenv("HOME");
+        env.home             = HOME_DIR ? HOME_DIR : "";
+    }
+
+    const char* XDG_STATE = env.user.empty() ? std::getenv("XDG_STATE_HOME") : nullptr;
+    env.state             = (XDG_STATE ? std::string(XDG_STATE) : env.home + "/.local/state") + "/halcyon";
+    env.saves             = env.home + "/.local/share/halcyon/saves";
+    env.history           = env.state + "/dots-history";
+    return env;
+}
+
+// Shell variables for the saves folder and the history, and the folder for them.
+static std::string historyVarsScript(const SSaveEnv& env) {
+    return "SAVES=" + shellQuote(env.saves) + "\n" + "HIST=" + shellQuote(env.history) + "\n" + "mkdir -p \"$SAVES\" \"$(dirname \"$HIST\")\"\n";
+}
+
+// Before a switch, when no switch is on record yet: store the Halcyon desktop being replaced, so "load -a" can go back to it.
+static std::string seedHistoryLine() {
+    return "if [ ! -s \"$HIST\" ]; then SEED=halcyon-before-$(date +%Y%m%d-%H%M%S); "
+           "hyprctl store -n \"$SEED\" && printf 'save\\t%s\\n' \"$SAVES/$SEED.dhyprsave\" >> \"$HIST\" || "
+           "echo 'Could not save the current dots, so load -a cannot go back to them.'; fi\n";
+}
+
+// After a switch: store the dots it switched to, and record them as the latest on the history.
+static std::string recordSwitchLine(const std::string& label) {
+    return "AUTO=auto-" + label +
+        "-$(date +%Y%m%d-%H%M%S); "
+        "hyprctl store -n \"$AUTO\" && printf 'save\\t%s\\n' \"$SAVES/$AUTO.dhyprsave\" >> \"$HIST\" || "
+        "echo 'Could not save the new dots, so load -a cannot go back to them.'\n";
+}
+
 // The dotfile sets `hyprctl dots <set> --install` can install. Each one is cloned as it is upstream and nothing in the
 // clone is edited. The entries it provides are backed up to ~/.local/state/halcyon/backups, then its own installer runs.
 // Every set replaces the desktop's config in ~/.config, so `hyprctl dots plus --install` brings Halcyon back.
@@ -481,6 +531,8 @@ static std::string dotSetScript(const SDotSet& set) {
     s += "command -v git >/dev/null 2>&1 || { echo 'git is needed to fetch the dotfiles. Install it, then run this again.'; exit 1; }\n";
     s += "mkdir -p \"$ROOT\"\n";
     s += "if [ -d \"$DIR/.git\" ]; then git -C \"$DIR\" pull --ff-only; else git clone --depth 1 " + shellQuote(std::string(set.url)) + " \"$DIR\"; fi\n";
+    s += historyVarsScript(saveEnv());
+    s += seedHistoryLine();
     s += "BK=\"$STATE/backups/" + NAME + "-$(date +%Y%m%d-%H%M%S)\"\n";
     s += "mkdir -p \"$BK/config\" \"$BK/bin\"\n";
     s += "entries() { find \"$1\" -mindepth 1 -maxdepth 1 -printf '%f\\n'; }\n";
@@ -498,6 +550,7 @@ static std::string dotSetScript(const SDotSet& set) {
             s += "entries \"$DIR/" + std::string(set.binDir) + "\" | while IFS= read -r n; do rm -rf \"$HOME/.local/bin/$n\"; done\n";
     }
     s += std::string(set.install) + "\n";
+    s += recordSwitchLine(NAME);
     s += "echo\n";
     s += "echo \"Installed " + std::string(set.title) + ". Your previous settings are in $BK\"\n";
     s += "echo \"To go back to Halcyon, run: hyprctl dots plus --install\"\n";
@@ -562,7 +615,9 @@ static int runPlus(int argc) {
         return 0;
     }
 
-    const std::string CMD = "cd " + shellQuote(repo) + " && HALCYON_SKIP_HYPRLAND_PLUS=1 ./setup install --force";
+    const SSaveEnv    ENV = saveEnv();
+    const std::string CMD = historyVarsScript(ENV) + seedHistoryLine() + "cd " + shellQuote(repo) + " || exit 1\nHALCYON_SKIP_HYPRLAND_PLUS=1 ./setup install --force || exit 1\n" +
+        recordSwitchLine("plus");
     execl("/bin/sh", "sh", "-c", CMD.c_str(), static_cast<char*>(nullptr));
     std::println("could not start the dots installer: {}", std::strerror(errno));
     return 1;
@@ -590,6 +645,179 @@ static int runDotsCommand(int argc, char** argv) {
     return dotsUsage();
 }
 
+// ---- Saves: hyprctl store and hyprctl load ----
+//
+// A save is a gzipped tar named <name>.dhyprsave, kept in ~/.local/share/halcyon/saves. It holds the dot files: every
+// top-level entry of ~/.config that a dot set installs (the Halcyon checkout's, and each clone's), as they are now. It
+// also holds the .local files the config refers to, only in .local/bin, the fonts, icons and themes folders, and the
+// Halcyon state files theme.lua and placement.lua. manifest.txt inside says what is in it.
+//
+// The switches (a dot set install, or a load) record their result in the history. "load -a" loads the save before the
+// latest one, so running it again goes back.
+
+// Sets ENTRIES to the top-level entries of ~/.config that any dot set installs.
+static std::string dotEntriesScript() {
+    std::string s = "ENTRIES=$( {\n"
+                    "  if [ -s \"$REPO_FILE\" ]; then find \"$(cat \"$REPO_FILE\")/dots/.config\" -mindepth 1 -maxdepth 1 -printf '%f\\n' 2>/dev/null || true; fi\n";
+    for (const auto& set : DOT_SETS)
+        s += "  find \"$HOME/.local/share/halcyon/dotsets/" + std::string(set.name) + "/" + std::string(set.configDir) +
+            "\" -mindepth 1 -maxdepth 1 -printf '%f\\n' 2>/dev/null || true\n";
+    s += "} | sort -u )\n";
+    return s;
+}
+
+// The shell variables every save script starts with.
+static std::string savePrelude(const SSaveEnv& env) {
+    return "set -e\n" + std::string("HOME=") + shellQuote(env.home) + "\n" + "STATE=" + shellQuote(env.state) + "\n" + "REPO_FILE=\"$STATE/repo\"\n" +
+        "SUDO_USER=" + shellQuote(env.user) + "\n" + historyVarsScript(env);
+}
+
+static std::string storeScript(const SSaveEnv& env, const std::string& name) {
+    std::string s = savePrelude(env);
+    s += "NAME=" + shellQuote(name) + "\n";
+    s += "OUT=\"$SAVES/$NAME.dhyprsave\"\n";
+    s += dotEntriesScript();
+    s += "STAGE=$(mktemp -d)\n";
+    s += "REFS=$(mktemp)\n";
+    s += "trap 'rm -rf \"$STAGE\" \"$REFS\"' EXIT\n";
+    s += "mkdir -p \"$STAGE/.config\" \"$STAGE/.local\"\n";
+    // The dot files, as they are now.
+    s += "printf '%s\\n' \"$ENTRIES\" | while IFS= read -r n; do\n"
+         "  if [ -n \"$n\" ] && [ -e \"$HOME/.config/$n\" ]; then cp -a \"$HOME/.config/$n\" \"$STAGE/.config/\"; fi\n"
+         "done\n";
+    // The .local files the config refers to, and the ones that are always used with it.
+    s += "grep -rhoaE '\\.local/[A-Za-z0-9_./-]+' \"$STAGE/.config\" 2>/dev/null | sed 's|[./]*$||' | sort -u > \"$REFS\" || true\n";
+    s += "(cd \"$HOME\" && find .local/share/fonts -mindepth 1 -maxdepth 1 -name 'illogical-impulse-*' 2>/dev/null) >> \"$REFS\" || true\n";
+    s += "printf '%s\\n' .local/state/halcyon/theme.lua .local/state/halcyon/placement.lua >> \"$REFS\"\n";
+    s += "while IFS= read -r p; do\n"
+         "  case \"$p\" in\n"
+         "    .local/bin/*|.local/share/fonts/*|.local/share/icons/*|.local/share/themes/*|.local/state/halcyon/theme.lua|.local/state/halcyon/placement.lua) ;;\n"
+         "    *) continue ;;\n"
+         "  esac\n"
+         "  if [ -e \"$HOME/$p\" ] || [ -L \"$HOME/$p\" ]; then mkdir -p \"$STAGE/$(dirname \"$p\")\"; cp -a \"$HOME/$p\" \"$STAGE/$p\"; fi\n"
+         "done < \"$REFS\"\n";
+    s += "{ echo 'dhyprsave 1'; echo \"created $(date '+%Y-%m-%d %H:%M')\"; echo 'config:'; ls -1 \"$STAGE/.config\"; "
+         "echo 'local:'; (cd \"$STAGE\" && find .local -type f -o -type l); } > \"$STAGE/manifest.txt\"\n";
+    s += "tar -C \"$STAGE\" -czf \"$OUT\" .\n";
+    s += "echo \"Saved $NAME to $OUT\"\n";
+    return s;
+}
+
+// Restores the save in ARCHIVE. chooseArchive is the shell line that sets ARCHIVE. The files the save replaces are
+// backed up to ~/.local/state/halcyon/backups/before-load-<time> first.
+static std::string loadScript(const SSaveEnv& env, const std::string& chooseArchive) {
+    std::string s = savePrelude(env) + chooseArchive;
+    s += "[ -f \"$ARCHIVE\" ] || { echo \"No save at $ARCHIVE\"; exit 1; }\n";
+    s += "STAGE=$(mktemp -d)\n";
+    s += "trap 'rm -rf \"$STAGE\"' EXIT\n";
+    s += "tar -xzf \"$ARCHIVE\" -C \"$STAGE\"\n";
+    s += "[ -f \"$STAGE/manifest.txt\" ] || { echo \"$ARCHIVE is not a save (no manifest.txt)\"; exit 1; }\n";
+    s += "BK=\"$STATE/backups/before-load-$(date +%Y%m%d-%H%M%S)-$$\"\n";
+    s += "mkdir -p \"$BK\"\n";
+    // What the save replaces: whole top-level entries of ~/.config, and the individual .local files it holds.
+    s += "{ (cd \"$STAGE\" && find .config -mindepth 1 -maxdepth 1); (cd \"$STAGE\" && find .local -type f -o -type l); } > \"$STAGE/.replace\"\n";
+    s += "while IFS= read -r p; do\n"
+         "  if [ -e \"$HOME/$p\" ] || [ -L \"$HOME/$p\" ]; then mkdir -p \"$BK/$(dirname \"$p\")\"; cp -a \"$HOME/$p\" \"$BK/$p\"; fi\n"
+         "done < \"$STAGE/.replace\"\n";
+    s += "while IFS= read -r p; do\n"
+         "  if [ -e \"$STAGE/$p\" ] || [ -L \"$STAGE/$p\" ]; then\n"
+         "    case \"$p\" in\n"
+         "      .config/*) rm -rf \"$HOME/$p\" ;;\n"
+         "      *) rm -f \"$HOME/$p\" ;;\n"
+         "    esac\n"
+         "    mkdir -p \"$HOME/$(dirname \"$p\")\"; cp -a \"$STAGE/$p\" \"$HOME/$p\"\n"
+         "  fi\n"
+         "done < \"$STAGE/.replace\"\n";
+    // Under sudo the files go back to the user who ran it, including the saves and the history.
+    s += "if [ -n \"$SUDO_USER\" ]; then\n"
+         "  while IFS= read -r p; do\n"
+         "    if [ -e \"$HOME/$p\" ]; then chown -R \"$SUDO_USER\" \"$HOME/$p\"; fi\n"
+         "  done < \"$STAGE/.replace\"\n"
+         "  chown -R \"$SUDO_USER\" \"$SAVES\" \"$STATE\"\n"
+         "fi\n";
+    s += "printf 'save\\t%s\\n' \"$ARCHIVE\" >> \"$HIST\"\n";
+    s += "echo \"Loaded $(basename \"$ARCHIVE\" .dhyprsave). The files it replaced are in $BK\"\n";
+    s += "if [ -n \"$HYPRLAND_INSTANCE_SIGNATURE\" ]; then hyprctl reload >/dev/null 2>&1 || true; "
+         "else echo 'Run hyprctl reload, or restart Hyprland, to apply it.'; fi\n";
+    return s;
+}
+
+// The ARCHIVE line for "load -a": the save before the latest one on the history.
+static std::string previousArchiveLine() {
+    return "COUNT=$(cat \"$HIST\" 2>/dev/null | wc -l | tr -d ' ')\n"
+           "if [ \"$COUNT\" -lt 2 ]; then echo 'There is no earlier dots save to load yet. A dots switch records one.'; exit 1; fi\n"
+           "ARCHIVE=$(tail -n 2 \"$HIST\" | head -n 1 | cut -f2)\n";
+}
+
+static std::string listScript(const SSaveEnv& env) {
+    std::string s = savePrelude(env);
+    s += "ACTIVE=$(tail -n 1 \"$HIST\" 2>/dev/null | cut -f2)\n";
+    s += "found=0\n";
+    s += "for f in \"$SAVES\"/*.dhyprsave; do\n"
+         "  [ -e \"$f\" ] || continue\n"
+         "  found=1\n"
+         "  mark=''\n"
+         "  if [ \"$f\" = \"$ACTIVE\" ]; then mark='  (active)'; fi\n"
+         "  printf '%-32s %6s  %s%s\\n' \"$(basename \"$f\" .dhyprsave)\" \"$(du -h \"$f\" | cut -f1)\" \"$(date -r \"$f\" '+%Y-%m-%d %H:%M')\" \"$mark\"\n"
+         "done\n";
+    s += "if [ \"$found\" = 0 ]; then echo 'No saves yet. Make one with: hyprctl store -n <name>'; fi\n";
+    return s;
+}
+
+// Save names are file names: letters, digits, '.', '_' and '-', not starting with '.'.
+static bool validSaveName(const std::string& name) {
+    if (name.empty() || name.front() == '.')
+        return false;
+    return std::ranges::all_of(name, [](unsigned char c) { return std::isalnum(c) || c == '.' || c == '_' || c == '-'; });
+}
+
+static int runShell(const std::string& script) {
+    execl("/bin/sh", "sh", "-c", script.c_str(), static_cast<char*>(nullptr));
+    std::println("could not start the save script: {}", std::strerror(errno));
+    return 1;
+}
+
+static int saveUsage() {
+    std::println("usage: hyprctl store -n <name>        save the dot files as <name>.dhyprsave");
+    std::println("       hyprctl load -l                list the saves");
+    std::println("       hyprctl load -a                load the save before the latest switch");
+    std::println("       hyprctl load -n <name>         load a save");
+    return 1;
+}
+
+// hyprctl store -n <name>
+static int runStore(int argc, char** argv) {
+    if (argc != 4 || std::string_view{argv[2]} != "-n")
+        return saveUsage();
+
+    const std::string NAME = argv[3];
+    if (!validSaveName(NAME)) {
+        std::println("save names use letters, digits, '.', '_' and '-'");
+        return 1;
+    }
+    return runShell(storeScript(saveEnv(), NAME));
+}
+
+// hyprctl load -l | -a | -n <name>
+static int runLoad(int argc, char** argv) {
+    const SSaveEnv         env = saveEnv();
+    const std::string_view OPT = argc >= 3 ? std::string_view{argv[2]} : std::string_view{};
+
+    if (argc == 3 && OPT == "-l")
+        return runShell(listScript(env));
+    if (argc == 3 && OPT == "-a")
+        return runShell(loadScript(env, previousArchiveLine()));
+    if (argc == 4 && OPT == "-n") {
+        const std::string NAME = argv[3];
+        if (!validSaveName(NAME)) {
+            std::println("save names use letters, digits, '.', '_' and '-'");
+            return 1;
+        }
+        return runShell(loadScript(env, "ARCHIVE=" + shellQuote(env.saves + "/" + NAME + ".dhyprsave") + "\n"));
+    }
+    return saveUsage();
+}
+
 int main(int argc, char** argv) {
     bool parseArgs = true;
 
@@ -600,6 +828,10 @@ int main(int argc, char** argv) {
 
     if (std::string_view{argv[1]} == "dots")
         return runDotsCommand(argc, argv);
+    if (std::string_view{argv[1]} == "store")
+        return runStore(argc, argv);
+    if (std::string_view{argv[1]} == "load")
+        return runLoad(argc, argv);
 
     std::string fullRequest      = "";
     std::string fullArgs         = "";
