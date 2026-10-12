@@ -430,11 +430,11 @@ std::string CHyprCtl::getWindowData(PHLWINDOW w, eHyprCtlOutputFormat format) {
             escapeJSONStrings(!w->m_workspace ? "" : w->m_workspace->m_name), (sc<int>(w->m_isFloating) == 1 ? "true" : "false"), w->monitorID(), escapeJSONStrings(w->m_class),
             escapeJSONStrings(w->m_title), escapeJSONStrings(w->m_initialClass), escapeJSONStrings(w->m_initialTitle), w->getPID(), (sc<int>(w->m_isX11) == 1 ? "true" : "false"),
             (w->m_pinned ? "true" : "false"), (w->isMini() ? "true" : "false"), (w->m_pinFullscreened ? "true" : "false"),
-            sc<uint8_t>(Fullscreen::controller()->getFullscreenModes(w).internal),
-            sc<uint8_t>(Fullscreen::controller()->getFullscreenModes(w).client), escapeJSONStrings(Fullscreen::controller()->getFullscreenHandlerNameAsString(w)),
-            (w->m_allowedOverFullscreen ? "true" : "false"), getGroupedData(w, format), getTagsData(w, format), rc<uintptr_t>(w->m_swallowee.get()), getFocusHistoryID(w),
-            (g_pInputManager->isWindowInhibiting(w, false) ? "true" : "false"), escapeJSONStrings(w->xdgTag().value_or("")), escapeJSONStrings(w->xdgDescription().value_or("")),
-            escapeJSONStrings(NContentType::toString(w->getContentType())), (w->m_tearingHint ? "true" : "false"), w->m_stableID);
+            sc<uint8_t>(Fullscreen::controller()->getFullscreenModes(w).internal), sc<uint8_t>(Fullscreen::controller()->getFullscreenModes(w).client),
+            escapeJSONStrings(Fullscreen::controller()->getFullscreenHandlerNameAsString(w)), (w->m_allowedOverFullscreen ? "true" : "false"), getGroupedData(w, format),
+            getTagsData(w, format), rc<uintptr_t>(w->m_swallowee.get()), getFocusHistoryID(w), (g_pInputManager->isWindowInhibiting(w, false) ? "true" : "false"),
+            escapeJSONStrings(w->xdgTag().value_or("")), escapeJSONStrings(w->xdgDescription().value_or("")), escapeJSONStrings(NContentType::toString(w->getContentType())),
+            (w->m_tearingHint ? "true" : "false"), w->m_stableID);
     } else {
         return std::format(
             "Window {:x} -> {}:\n\tmapped: {}\n\thidden: {}\n\tvisible: {}\n\tacceptsInput: {}\n\tat: {},{}\n\tsize: {},{}\n\tworkspace: {} ({})\n\tfloating: {}\n\tmonitor: "
