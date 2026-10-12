@@ -17,6 +17,8 @@ permissions:
 jobs:
   codeowners:
     name: 'Run Codeowners Plus'
+    # Disabled for this fork: it requests reviews from upstream owners who are not collaborators here.
+    if: false
     runs-on: ubuntu-latest
     steps:
       - name: 'Checkout Code Repository'
