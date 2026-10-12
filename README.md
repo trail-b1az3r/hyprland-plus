@@ -33,6 +33,43 @@ easy IPC, much more QoL stuff than other compositors and more...
 
 </div>
 
+# This fork (Halcyon)
+
+This is Hyprland 0.56.0 with a change to how a tiled window that is dragged becomes floating. Upstream
+centres the window on the cursor when it floats, so the window jumps. This happens with apps that draw
+their own top bar and ask Hyprland to move them, such as Firefox and Dolphin.
+
+## New option: `binds:drag_keep_grab_point`
+
+- Type: boolean, default `false`. Upstream behaviour is unchanged unless you turn it on.
+- When on, a tiled or fullscreen window that becomes floating while dragged keeps the exact pixel offset
+  between the cursor and the window, so the grab point does not move. If the offset is larger than the new
+  window, it is clamped to the window's edge.
+- It takes precedence over `binds:drag_center_window`.
+
+Lua (`hl.config`):
+
+```lua
+hl.config({ binds = { drag_keep_grab_point = true, drag_center_window = false } })
+```
+
+Hyprlang:
+
+```
+binds {
+    drag_keep_grab_point = true
+}
+```
+
+Source: `src/config/values/ConfigValues.cpp` (option declaration) and
+`src/layout/supplementary/DragController.cpp` (`updateDragWindow`, `MAPDRAGHOTSPOT`).
+
+### Status
+
+Not built or run yet. In the session where this was written, the build dependencies (hyprutils, aquamarine,
+hyprlang, hyprgraphics, hyprcursor, wayland-server, libinput) were not installed, so the files were not
+compiled. Build it and test a drag before relying on it.
+
 # Features
 
 - All of the eyecandy: gradient borders, many types of blur, animations, glow, shadows and much more
