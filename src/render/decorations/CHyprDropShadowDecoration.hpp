@@ -1,7 +1,7 @@
 #pragma once
 
-#include "AnimatedDecorationGradient.hpp"
 #include "IHyprWindowDecoration.hpp"
+#include "../../config/shared/complex/ComplexDataTypes.hpp"
 
 struct SShadowRenderData {
     bool  valid = false;
@@ -20,7 +20,7 @@ class CHyprDropShadowDecoration : public IHyprWindowDecoration {
 
     virtual void                       onPositioningReply(const SDecorationPositioningReply& reply);
 
-    virtual void                       draw(Render::CRenderContext& ctx, PHLMONITOR, float const& a, const Render::SWindowRenderPresentation& presentation);
+    virtual void                       draw(PHLMONITOR, float const& a);
 
     virtual eDecorationType            getDecorationType();
 
@@ -34,34 +34,26 @@ class CHyprDropShadowDecoration : public IHyprWindowDecoration {
 
     virtual std::string                getDisplayName();
 
-    virtual void                       initializeAnimations() override;
-    virtual void                       updateState() override;
-    virtual void                       onWindowMap() override;
-    virtual void                       onWindowFocus() override;
-
     bool                               canRender(PHLMONITOR);
-    SShadowRenderData                  getRenderData(Render::CRenderContext& ctx, PHLMONITOR, float const& a, const Render::SWindowRenderPresentation& presentation);
-    void                               reposition(Render::CRenderContext& ctx);
+    SShadowRenderData                  getRenderData(PHLMONITOR, float const& a);
+    void                               reposition();
 
     // TODO remove
-    void render(Render::CRenderContext& ctx, PHLMONITOR, float const& a, const Render::SWindowRenderPresentation& presentation);
+    void render(PHLMONITOR, float const& a);
 
   private:
-    SBoxExtents                 m_extents;
-    SBoxExtents                 m_reportedExtents;
+    SBoxExtents  m_extents;
+    SBoxExtents  m_reportedExtents;
 
-    PHLWINDOWREF                m_window;
+    PHLWINDOWREF m_window;
 
-    CAnimatedDecorationGradient m_gradient;
+    Vector2D     m_lastWindowPos;
+    Vector2D     m_lastWindowSize;
 
-    Vector2D                    m_lastWindowPos;
-    Vector2D                    m_lastWindowSize;
+    void         drawShadowInternal(const CBox& box, int round, float roundingPower, int range, const Config::CGradientValueData& grad, float a);
+    void         drawShadowInternal(const CBox& box, int round, float roundingPower, int range, const Config::CGradientValueData& grad1, const Config::CGradientValueData& grad2,
+                                    float lerp, float a);
 
-    void drawShadowInternal(Render::CRenderContext& ctx, const CBox& box, int round, float roundingPower, int range, const Config::CGradientValueData& grad, float a,
-                            const Render::SWindowRenderPresentation& presentation);
-    void drawShadowInternal(Render::CRenderContext& ctx, const CBox& box, int round, float roundingPower, int range, const Config::CGradientValueData& grad1,
-                            const Config::CGradientValueData& grad2, float lerp, float a, const Render::SWindowRenderPresentation& presentation);
-
-    CBox m_lastWindowBox          = {0};
-    CBox m_lastWindowBoxWithDecos = {0};
+    CBox         m_lastWindowBox          = {0};
+    CBox         m_lastWindowBoxWithDecos = {0};
 };

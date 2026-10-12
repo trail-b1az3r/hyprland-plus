@@ -11,7 +11,6 @@
 #include <hyprutils/math/Vector2D.hpp>
 
 namespace Render {
-    class CSceneResources;
     const std::vector<const char*> ASSET_PATHS = {
 #ifdef DATAROOTDIR
         DATAROOTDIR,
@@ -40,18 +39,6 @@ namespace Render {
         RENDER_MODE_TO_BUFFER_READ_ONLY = 3,
     };
 
-    struct SRenderOptions {
-        float               mouseZoomFactor    = 1.f;
-        bool                mouseZoomUseMouse  = true;
-        bool                useNearestNeighbor = false;
-        SP<CSceneResources> sceneResources;
-    };
-
-    struct SRenderResult {
-        // Damage after finalization, before the output transform.
-        CRegion finalDamage;
-    };
-
     struct SRenderWorkspaceUntilData {
         PHLLS     ls;
         PHLWINDOW w;
@@ -59,7 +46,7 @@ namespace Render {
 
     enum eRenderProjectionType : uint8_t {
         RPT_MONITOR,
-        RPT_OUTPUT,
+        RPT_MIRROR,
         RPT_FB,
         RPT_EXPORT,
     };
@@ -115,9 +102,8 @@ namespace Render {
         PHLWINDOWREF           currentWindow;
         WP<CWLSurfaceResource> surface;
 
-        bool                   transformDamage            = true;
-        bool                   noSimplify                 = false;
-        bool                   renderingTransformedSource = false;
+        bool                   transformDamage = true;
+        bool                   noSimplify      = false;
     };
 
     struct STFRange {

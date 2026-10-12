@@ -17,8 +17,6 @@
 #elif defined(__FreeBSD__)
 #include <signal.h>
 #include <sys/procctl.h>
-#elif defined(__OpenBSD__)
-#include <signal.h>
 #endif
 
 #include <hyprutils/os/Process.hpp>

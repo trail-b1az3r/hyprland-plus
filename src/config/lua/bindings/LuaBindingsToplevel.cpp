@@ -11,9 +11,7 @@
 #include "../../../managers/eventLoop/EventLoopManager.hpp"
 #include "../../../managers/SessionLockManager.hpp"
 #include "../../../plugins/PluginSystem.hpp"
-#include "../../../keybinds/Manager.hpp"
-#include "../../../keybinds/Resolver.hpp"
-#include "../../../helpers/string/StringUtils.hpp"
+#include "managers/KeybindManager.hpp"
 
 #include <hyprutils/string/Numeric.hpp>
 #include <hyprutils/string/String.hpp>
@@ -26,59 +24,110 @@ using namespace Hyprutils::String;
 
 extern "C" {
 #include <lua.h>
-#include <lauxlib.h>
 #include <xkbcommon/xkbcommon.h>
 }
 
-static std::expected<std::vector<std::string>, std::string> parseKeyString(std::string_view value) {
-    CVarList2                list(value, 0, '+', true);
-    std::vector<std::string> keys;
-    keys.reserve(list.size());
+static std::optional<eKeyboardModifiers> modFromSv(std::string_view sv) {
+    if (sv == "SHIFT")
+        return HL_MODIFIER_SHIFT;
+    if (sv == "CAPS")
+        return HL_MODIFIER_CAPS;
+    if (sv == "CTRL" || sv == "CONTROL")
+        return HL_MODIFIER_CTRL;
+    if (sv == "ALT" || sv == "MOD1")
+        return HL_MODIFIER_ALT;
+    if (sv == "MOD2")
+        return HL_MODIFIER_MOD2;
+    if (sv == "MOD3")
+        return HL_MODIFIER_MOD3;
+    if (sv == "SUPER" || sv == "WIN" || sv == "LOGO" || sv == "MOD4" || sv == "META")
+        return HL_MODIFIER_META;
+    if (sv == "MOD5")
+        return HL_MODIFIER_MOD5;
 
-    for (const auto& entry : list) {
-        auto key = Hyprutils::String::trim(entry);
-        if (key.empty())
-            return std::unexpected("Empty key in key list");
-
-        keys.emplace_back(std::move(key));
-    }
-
-    if (keys.empty())
-        return std::unexpected("A bind requires a key");
-
-    // check duplicates
-    for (const auto& k : keys) {
-        for (const auto& k2 : keys) {
-            if (&k == &k2)
-                continue;
-
-            if (StringUtils::cmpCaseInsensitive(k, k2))
-                return std::unexpected("Repeated key in the key string");
-        }
-    }
-
-    return keys;
+    return std::nullopt;
 }
 
-class CLuaBindRef {
-  public:
-    CLuaBindRef(SP<SLuaStateLifetime> lifetime, int ref) : m_lifetime(std::move(lifetime)), m_ref(ref) {
-        ;
+static bool isSymSpecial(std::string_view sv) {
+    if (sv == "mouse_down" || sv == "mouse_up" || sv == "mouse_left" || sv == "mouse_right")
+        return true;
+
+    return sv.starts_with("switch:") || sv.starts_with("mouse:");
+}
+
+static std::expected<void, std::string> parseKeyString(SKeybind& kb, std::string_view sv) {
+    bool                                                modsEnded = false, specialSym = false;
+    CVarList2                                           vl(sv, 0, '+', true);
+
+    uint32_t                                            modMask = 0;
+    std::vector<std::pair<xkb_keysym_t, xkb_keycode_t>> keysyms;
+    std::string                                         lastKeyArg;
+
+    if (sv == "catchall") {
+        kb.catchAll = true;
+        return {};
     }
 
-    ~CLuaBindRef() {
-        if (m_lifetime && m_lifetime->state && m_ref != LUA_NOREF && m_ref != LUA_REFNIL)
-            luaL_unref(m_lifetime->state, LUA_REGISTRYINDEX, m_ref);
+    for (const auto& a : vl) {
+        auto arg = Hyprutils::String::trim(a);
+
+        auto mask = modFromSv(arg);
+
+        if (!mask)
+            modsEnded = true;
+
+        if (modsEnded && mask)
+            return std::unexpected("Modifiers must come first in the list");
+
+        if (mask) {
+            modMask |= *mask;
+            continue;
+        }
+
+        if (specialSym)
+            return std::unexpected("Cannot combine special syms (e.g. mouse_down + Q)");
+
+        if (isSymSpecial(arg)) {
+            if (!keysyms.empty())
+                return std::unexpected("Cannot combine special syms (e.g. mouse_down + Q)");
+
+            specialSym = true;
+            kb.key     = arg;
+            continue;
+        }
+
+        if (arg.starts_with("code:") && isNumber(std::string{arg.substr(5)})) {
+            auto res = strToNumber<uint32_t>(arg.substr(5));
+
+            if (!res)
+                return std::unexpected(std::format("Invalid keycode: \"{}\".", arg));
+
+            keysyms.emplace_back(XKB_KEY_NoSymbol, xkb_keycode_t{*res});
+            continue;
+        }
+
+        auto sym = xkb_keysym_from_name(std::string{arg}.c_str(), XKB_KEYSYM_CASE_INSENSITIVE);
+
+        if (sym == XKB_KEY_NoSymbol) {
+            if (arg.contains(' '))
+                return std::unexpected(std::format("Unknown keysym: \"{}\", did you forget a +?", arg));
+
+            if (arg == "Enter")
+                return std::unexpected(std::format(R"(Unknown keysym: "{}", did you mean "Return"?)", arg));
+
+            return std::unexpected(std::format("Unknown keysym: \"{}\"", arg));
+        }
+
+        lastKeyArg = arg;
+        keysyms.emplace_back(sym, 0);
     }
 
-    int ref() const {
-        return m_ref;
-    }
-
-  private:
-    SP<SLuaStateLifetime> m_lifetime;
-    int                   m_ref = LUA_NOREF;
-};
+    kb.modmask = modMask;
+    kb.sMkKeys = std::move(keysyms);
+    if (!specialSym && !lastKeyArg.empty())
+        kb.key = lastKeyArg;
+    return {};
+}
 
 static int hlBind(lua_State* L) {
     auto* mgr = sc<CConfigManager*>(lua_touserdata(L, lua_upvalueindex(1)));
@@ -87,35 +136,25 @@ static int hlBind(lua_State* L) {
     if (!str)
         return Internal::configError(L, std::format("bind: bad argument 1: {}", str.error()));
 
-    const std::string_view DISPLAY_KEYS = *str;
-    auto                   keys         = parseKeyString(DISPLAY_KEYS);
-    if (!keys)
-        return Internal::configError(L, std::format("hl.bind: failed to parse key string: {}", keys.error()));
+    std::string_view keys = *str;
 
-    const std::string handler = luaL_tolstring(L, 2, nullptr);
-    lua_pop(L, 1);
+    SKeybind         kb;
+    kb.submap.name  = mgr->m_currentSubmap;
+    kb.submap.reset = mgr->m_currentSubmapReset;
 
-    if (const auto result = Internal::pushDispatcherFunction(L, 2); !result)
-        return Internal::configError(L, std::format("hl.bind: {}", result.error()));
+    if (auto res = parseKeyString(kb, keys); !res)
+        return Internal::configError(L, std::format("hl.bind: failed to parse key string: {}", res.error()));
 
-    if (DISPLAY_KEYS == "catchall" && mgr->m_currentSubmap.empty())
+    if (!Internal::pushDispatcherFunction(L, 2))
+        return Internal::configError(L, "hl.bind: dispatcher must be a dispatcher (e.g. hl.dsp.window.close()) or a lua function");
+
+    if (kb.catchAll && mgr->m_currentSubmap.empty())
         return Internal::configError(L, "hl.bind: catchall keybinds are only allowed in submaps.");
 
-    const auto               LUA_LIFETIME = mgr->luaStateLifetime();
-    const auto               LUA_MANAGER  = Config::Lua::mgr();
-    const auto               LUA_REF      = makeShared<CLuaBindRef>(LUA_LIFETIME, luaL_ref(L, LUA_REGISTRYINDEX));
-
-    Keybinds::BindFlags      flags = 0;
-    Keybinds::SExtraBindArgs args{
-        .metadata =
-            {
-                .displayKey  = std::string{DISPLAY_KEYS},
-                .handler     = handler,
-                .argument    = std::to_string(LUA_REF->ref()),
-                .submap      = mgr->m_currentSubmap,
-                .submapReset = mgr->m_currentSubmapReset,
-            },
-    };
+    int ref       = luaL_ref(L, LUA_REGISTRYINDEX);
+    kb.handler    = "__lua";
+    kb.arg        = std::to_string(ref);
+    kb.displayKey = keys;
 
     int optsIdx = 3;
 
@@ -146,66 +185,54 @@ static int hlBind(lua_State* L) {
             return result;
         };
 
-        const bool REPEATING      = getBool("repeating");
-        const bool LOCKED         = getBool("locked");
-        const bool RELEASE        = getBool("release");
-        const bool NON_CONSUMING  = getBool("non_consuming");
-        const bool AUTO_CONSUMING = getBool("auto_consuming");
-        const bool TRANSPARENT    = getBool("transparent");
-        const bool IGNORE_MODS    = getBool("ignore_mods");
-        const bool DONT_INHIBIT   = getBool("dont_inhibit");
-        const bool LONG_PRESS     = getBool("long_press");
-        const bool UNIVERSAL      = getBool("submap_universal");
-        const bool MOUSE          = getBool("mouse");
-
-        flags |= REPEATING ? Keybinds::BIND_FLAG_REPEAT : 0;
-        flags |= LOCKED ? Keybinds::BIND_FLAG_LOCKED : 0;
-        flags |= RELEASE ? Keybinds::BIND_FLAG_RELEASE : 0;
-        flags |= NON_CONSUMING ? Keybinds::BIND_FLAG_NON_CONSUMING : 0;
-        flags |= AUTO_CONSUMING ? Keybinds::BIND_FLAG_AUTO_CONSUMING : 0;
-        flags |= TRANSPARENT ? Keybinds::BIND_FLAG_TRANSPARENT : 0;
-        flags |= IGNORE_MODS ? Keybinds::BIND_FLAG_IGNORE_MODS : 0;
-        flags |= DONT_INHIBIT ? Keybinds::BIND_FLAG_DONT_INHIBIT : 0;
-        flags |= LONG_PRESS ? Keybinds::BIND_FLAG_LONG_PRESS : 0;
-        flags |= UNIVERSAL ? Keybinds::BIND_FLAG_SUBMAP_UNIVERSAL : 0;
-        flags |= MOUSE ? Keybinds::BIND_FLAG_MOUSE : 0;
+        kb.repeat          = getBool("repeating");
+        kb.locked          = getBool("locked");
+        kb.release         = getBool("release");
+        kb.nonConsuming    = getBool("non_consuming");
+        kb.autoConsuming   = getBool("auto_consuming");
+        kb.transparent     = getBool("transparent");
+        kb.ignoreMods      = getBool("ignore_mods");
+        kb.dontInhibit     = getBool("dont_inhibit");
+        kb.longPress       = getBool("long_press");
+        kb.submapUniversal = getBool("submap_universal");
 
         if (auto description = readOptString("description"); description.has_value()) {
-            args.metadata.description = std::move(*description);
+            kb.description    = *description;
+            kb.hasDescription = true;
         } else if (auto desc = readOptString("desc"); desc.has_value()) {
-            args.metadata.description = std::move(*desc);
+            kb.description    = *desc;
+            kb.hasDescription = true;
         }
 
         bool click = false;
         bool drag  = false;
 
         if (getBool("click")) {
-            click = true;
-            flags |= Keybinds::BIND_FLAG_RELEASE;
+            click      = true;
+            kb.release = true;
         }
 
         if (getBool("drag")) {
-            drag = true;
-            flags |= Keybinds::BIND_FLAG_RELEASE;
+            drag       = true;
+            kb.release = true;
         }
 
         if (click && drag)
             return Internal::configError(L, "hl.bind: click and drag are exclusive");
 
-        if ((LONG_PRESS || (flags & Keybinds::BIND_FLAG_RELEASE)) && REPEATING)
+        if ((kb.longPress || kb.release) && kb.repeat)
             return Internal::configError(L, "hl.bind: long_press / release is incompatible with repeat");
 
-        if (MOUSE && (REPEATING || (flags & Keybinds::BIND_FLAG_RELEASE) || LOCKED))
+        if (kb.mouse && (kb.repeat || kb.release || kb.locked))
             return Internal::configError(L, "hl.bind: mouse is exclusive");
 
-        flags |= click ? Keybinds::BIND_FLAG_CLICK : 0;
-        flags |= drag ? Keybinds::BIND_FLAG_DRAG : 0;
+        kb.click = click;
+        kb.drag  = drag;
 
         lua_getfield(L, optsIdx, "device");
         if (lua_istable(L, -1)) {
             lua_getfield(L, -1, "inclusive");
-            const bool INCLUSIVE = lua_isnil(L, -1) ? true : lua_toboolean(L, -1);
-            flags |= INCLUSIVE ? Keybinds::BIND_FLAG_DEVICE_INCLUSIVE : 0;
+            kb.deviceInclusive = lua_isnil(L, -1) ? true : lua_toboolean(L, -1);
             lua_pop(L, 1);
 
             lua_getfield(L, -1, "list");
@@ -213,39 +240,17 @@ static int hlBind(lua_State* L) {
                 lua_pushnil(L);
                 while (lua_next(L, -2)) {
                     if (lua_isstring(L, -1))
-                        args.devices.emplace(lua_tostring(L, -1));
+                        kb.devices.emplace(lua_tostring(L, -1));
                     lua_pop(L, 1);
                 }
             }
             lua_pop(L, 1);
         }
-        flags |= getBool("allow_input_capture") ? Keybinds::BIND_FLAG_ALLOW_INPUT_CAPTURE : 0;
+        kb.allowInputCapture = getBool("allow_input_capture");
         lua_pop(L, 1);
     }
 
-    if (DISPLAY_KEYS == "catchall")
-        flags |= Keybinds::BIND_FLAG_CATCH_ALL;
-
-    auto bind = Keybinds::CBind::make(
-        std::move(*keys), flags,
-        [LUA_LIFETIME, mgr = LUA_MANAGER, LUA_REF] {
-            if (!mgr || !LUA_LIFETIME || !LUA_LIFETIME->state)
-                return Keybinds::SBindResult{.success = false, .error = "Lua keybind belongs to an expired config state"};
-
-            const auto result = mgr->callLuaFnBind(LUA_REF->ref());
-            return Keybinds::SBindResult{
-                .passEvent = result.passEvent,
-                .success   = result.success,
-                .error     = result.error,
-                .followUp  = result.requestRelease ? Keybinds::BIND_FOLLOW_UP_TRIGGER_RELEASE : Keybinds::BIND_FOLLOW_UP_NONE,
-            };
-        },
-        std::move(args));
-    if (!bind) {
-        return Internal::configError(L, std::format("hl.bind: failed to create bind: {}", bind.error()));
-    }
-
-    const auto BIND = Keybinds::mgr()->addBind(std::move(*bind));
+    const auto BIND = g_pKeybindManager->addKeybind(kb);
     Objects::CLuaKeybind::push(L, BIND);
     return 1;
 }
@@ -345,8 +350,8 @@ static int hlClearCrashedLockscreen(lua_State* L) {
 }
 
 static int hlDispatch(lua_State* L) {
-    if (const auto result = Internal::pushDispatcherFunction(L, 1); !result)
-        return Internal::configError(L, std::format("hl.dispatch: {}", result.error()));
+    if (!Internal::pushDispatcherFunction(L, 1))
+        return Internal::configError(L, "hl.dispatch: expected a dispatcher (e.g. hl.dsp.window.close())");
 
     int status = LUA_OK;
     if (auto* mgr = CConfigManager::fromLuaState(L); mgr)
@@ -385,7 +390,7 @@ static int hlOn(lua_State* L) {
         const auto& known = CLuaEventHandler::knownEvents();
         std::string list;
         for (const auto& e : known) {
-            list += std::format("{}, ", e);
+            list += e + ", ";
         }
         list.pop_back();
         list.pop_back();
@@ -398,14 +403,14 @@ static int hlOn(lua_State* L) {
 
 static int hlUnbind(lua_State* L) {
     if (lua_isstring(L, 1) && std::string_view(lua_tostring(L, 1)) == "all" && lua_gettop(L) == 1) {
-        Keybinds::mgr()->clearBinds();
+        g_pKeybindManager->clearKeybinds();
         return 0;
     }
 
     auto str = Check::string(L, 1);
     if (!str)
         return Internal::configError(L, std::format("unbind: bad argument 1: {}", str.error()));
-    Keybinds::mgr()->removeBinds(*str);
+    g_pKeybindManager->removeKeybind(*str);
 
     return 0;
 }
@@ -418,7 +423,14 @@ static int hlIsKeyDown(lua_State* L) {
             return Internal::configError(L, std::format("hl.is_key_down: invalid keycode {}", keycode));
 
         // Return whether it's pressed or not
-        lua_pushboolean(L, Keybinds::mgr()->inputState().isKeycodeDown(sc<xkb_keycode_t>(keycode)));
+        auto isKeyDown = false;
+        for (auto& k : g_pKeybindManager->m_pressedKeys) {
+            if (k.keycode == keycode) {
+                isKeyDown = true;
+                break;
+            }
+        }
+        lua_pushboolean(L, isKeyDown);
         return 1;
     } else if (lua_isstring(L, 1)) {
         // Parse keysym
@@ -432,7 +444,14 @@ static int hlIsKeyDown(lua_State* L) {
         }
 
         // Return whether it's pressed or not
-        lua_pushboolean(L, Keybinds::mgr()->inputState().isKeysymDown(sym));
+        auto isKeyDown = false;
+        for (auto& k : g_pKeybindManager->m_pressedKeys) {
+            if (k.keysym == sym) {
+                isKeyDown = true;
+                break;
+            }
+        }
+        lua_pushboolean(L, isKeyDown);
         return 1;
     }
     return Internal::configError(L, std::format("hl.is_key_down: bad argument 1: expected integer or string"));
@@ -484,7 +503,7 @@ static int hlTimer(lua_State* L) {
                 status = lua_pcall(L, 0, 0, 0);
 
             if (status != LUA_OK) {
-                LOG(Log::ERR, "[Lua] error in timer callback: {}", lua_tostring(L, -1));
+                Log::logger->log(Log::ERR, "[Lua] error in timer callback: {}", lua_tostring(L, -1));
                 lua_pop(L, 1);
             }
 

@@ -17,6 +17,8 @@ permissions:
 jobs:
   codeowners:
     name: 'Run Codeowners Plus'
+    # Disabled for this fork: it requests reviews from upstream owners who are not collaborators here.
+    if: false
     runs-on: ubuntu-latest
     steps:
       - name: 'Checkout Code Repository'
@@ -28,7 +30,7 @@ jobs:
         run: git fetch origin ${{ github.event.pull_request.head.sha }}
 
       - name: 'Codeowners Plus'
-        uses: multimediallc/codeowners-plus@v1.10.0
+        uses: multimediallc/codeowners-plus@v1.9.1
         with:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           pr: '${{ github.event.pull_request.number }}'

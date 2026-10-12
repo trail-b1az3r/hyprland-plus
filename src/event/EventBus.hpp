@@ -15,24 +15,11 @@
 #include "../SharedDefs.hpp"
 #include <unordered_map>
 #include <variant>
-#include <functional>
-#include <optional>
-
-namespace Render {
-    class CRenderContext;
-}
 
 namespace Desktop {
-    enum eFocusReason : uint32_t;
+    enum eFocusReason : uint8_t;
 }
 namespace Event {
-    struct SRenderStageEvent {
-        eRenderStage stage = RENDER_PRE;
-        PHLMONITOR   monitor;
-        // Borrowed only for this synchronous emission; PRE and POST have no live context.
-        std::optional<std::reference_wrapper<Render::CRenderContext>> context;
-    };
-
     struct SCallbackInfo {
         bool cancelled = false; /* on cancellable events, will cancel the event. */
     };
@@ -100,11 +87,9 @@ namespace Event {
                 Event<PHLWINDOW>                        class_;
                 Event<PHLWINDOW>                        pin;
                 Event<PHLWINDOW>                        fullscreen;
-                Event<PHLWINDOW, bool>                  minimize;
                 Event<PHLWINDOW>                        floating;
                 Event<PHLWINDOW>                        updateRules;
                 Event<PHLWINDOW, PHLWORKSPACE>          moveToWorkspace;
-                Cancellable<PHLWINDOW>                  bell;
             } window;
 
             struct {
@@ -147,9 +132,9 @@ namespace Event {
             } input;
 
             struct {
-                Event<PHLMONITOR>        preChecks;
-                Event<PHLMONITOR>        pre;
-                Event<SRenderStageEvent> stage;
+                Event<PHLMONITOR>   preChecks;
+                Event<PHLMONITOR>   pre;
+                Event<eRenderStage> stage;
             } render;
 
             struct {
@@ -190,7 +175,6 @@ namespace Event {
                 Event<PHLWORKSPACE, PHLMONITOR> specialActive;
                 Event<PHLWORKSPACEREF>          created;
                 Event<PHLWORKSPACEREF>          removed;
-                Event<PHLWORKSPACEREF>          renamed;
             } workspace;
 
             struct {

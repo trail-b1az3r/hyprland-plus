@@ -27,7 +27,7 @@ CScreencopyClient::CScreencopyClient(SP<CZwlrScreencopyManagerV1> resource_) : m
 void CScreencopyClient::captureOutput(uint32_t frame, int32_t overlayCursor_, wl_resource* output, CBox box) {
     const auto PMONITORRES = CWLOutputResource::fromResource(output);
     if (!PMONITORRES || !PMONITORRES->m_monitor) {
-        LOG(Log::ERR, "Tried to capture invalid output/monitor in {:x}", (uintptr_t)this);
+        LOGM(Log::ERR, "Tried to capture invalid output/monitor in {:x}", (uintptr_t)this);
         m_resource->error(-1, "invalid output");
         return;
     }
@@ -40,7 +40,7 @@ void CScreencopyClient::captureOutput(uint32_t frame, int32_t overlayCursor_, wl
         makeShared<CScreencopyFrame>(makeShared<CZwlrScreencopyFrameV1>(m_resource->client(), m_resource->version(), frame), session, !!overlayCursor_));
 
     if (!FRAME->good()) {
-        LOG(Log::ERR, "Couldn't alloc frame for sharing! (no memory)");
+        LOGM(Log::ERR, "Couldn't alloc frame for sharing! (no memory)");
         m_resource->noMemory();
         PROTO::screencopy->destroyResource(FRAME.get());
         return;
@@ -64,16 +64,11 @@ CScreencopyFrame::CScreencopyFrame(SP<CZwlrScreencopyFrameV1> resource_, WP<CScr
     m_resource->setCopy([this](CZwlrScreencopyFrameV1* pFrame, wl_resource* res) { shareFrame(pFrame, res, false); });
     m_resource->setCopyWithDamage([this](CZwlrScreencopyFrameV1* pFrame, wl_resource* res) { shareFrame(pFrame, res, true); });
 
-    if (!m_session || !m_session->isActive()) {
-        m_resource->sendFailed();
-        return;
-    }
-
     m_frame = m_session->nextFrame(overlayCursor);
 
     auto formats = m_session->allowedFormats();
     if (formats.empty()) {
-        LOG(Log::ERR, "No format supported by renderer in screencopy protocol");
+        LOGM(Log::ERR, "No format supported by renderer in screencopy protocol");
         m_resource->sendFailed();
         return;
     }
@@ -84,7 +79,7 @@ CScreencopyFrame::CScreencopyFrame(SP<CZwlrScreencopyFrameV1> resource_, WP<CScr
     const auto PSHMINFO = getPixelFormatFromDRM(format);
 
     if (!PSHMINFO) {
-        LOG(Log::ERR, "No pixel format for drm format");
+        LOGM(Log::ERR, "No pixel format for drm format");
         m_resource->sendFailed();
         return;
     }
@@ -102,18 +97,18 @@ CScreencopyFrame::CScreencopyFrame(SP<CZwlrScreencopyFrameV1> resource_, WP<CScr
 
 void CScreencopyFrame::shareFrame(CZwlrScreencopyFrameV1* pFrame, wl_resource* buffer, bool withDamage) {
     if UNLIKELY (!good()) {
-        LOG(Log::ERR, "No frame in shareFrame??");
+        LOGM(Log::ERR, "No frame in shareFrame??");
         return;
     }
 
     if UNLIKELY (m_session.expired() || !m_session->monitor()) {
-        LOG(Log::ERR, "Session stopped for frame {:x}", (uintptr_t)this);
+        LOGM(Log::ERR, "Session stopped for frame {:x}", (uintptr_t)this);
         m_resource->sendFailed();
         return;
     }
 
     if UNLIKELY (m_buffer) {
-        LOG(Log::ERR, "Buffer used in {:x}", (uintptr_t)this);
+        LOGM(Log::ERR, "Buffer used in {:x}", (uintptr_t)this);
         m_resource->error(ZWLR_SCREENCOPY_FRAME_V1_ERROR_ALREADY_USED, "frame already used");
         m_resource->sendFailed();
         return;
@@ -121,7 +116,7 @@ void CScreencopyFrame::shareFrame(CZwlrScreencopyFrameV1* pFrame, wl_resource* b
 
     const auto PBUFFERRES = CWLBufferResource::fromResource(buffer);
     if UNLIKELY (!PBUFFERRES || !PBUFFERRES->m_buffer) {
-        LOG(Log::ERR, "Invalid buffer in {:x}", (uintptr_t)this);
+        LOGM(Log::ERR, "Invalid buffer in {:x}", (uintptr_t)this);
         m_resource->error(ZWLR_SCREENCOPY_FRAME_V1_ERROR_INVALID_BUFFER, "invalid buffer");
         m_resource->sendFailed();
         return;
@@ -148,7 +143,7 @@ void CScreencopyFrame::shareFrame(CZwlrScreencopyFrameV1* pFrame, wl_resource* b
                 break;
             }
             case RESULT_NOT_COPIED:
-                LOG(Log::ERR, "Frame share failed in {:x}", (uintptr_t)this);
+                LOGM(Log::ERR, "Frame share failed in {:x}", (uintptr_t)this);
                 m_resource->sendFailed();
                 break;
             case RESULT_TIMESTAMP: m_timestamp = Time::steadyNow(); break;
@@ -177,7 +172,7 @@ void CScreencopyProtocol::bindManager(wl_client* client, void* data, uint32_t ve
     const auto CLIENT = m_clients.emplace_back(makeShared<CScreencopyClient>(makeShared<CZwlrScreencopyManagerV1>(client, ver, id)));
 
     if (!CLIENT->good()) {
-        LOG(Log::DEBUG, "Failed to bind client! (out of memory)");
+        LOGM(Log::DEBUG, "Failed to bind client! (out of memory)");
         CLIENT->m_resource->noMemory();
         m_clients.pop_back();
         return;
@@ -185,7 +180,7 @@ void CScreencopyProtocol::bindManager(wl_client* client, void* data, uint32_t ve
 
     CLIENT->m_self = CLIENT;
 
-    LOG(Log::DEBUG, "Bound client successfully!");
+    LOGM(Log::DEBUG, "Bound client successfully!");
 }
 
 void CScreencopyProtocol::destroyResource(CScreencopyClient* client) {

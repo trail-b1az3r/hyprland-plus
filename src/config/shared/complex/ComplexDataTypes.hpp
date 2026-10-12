@@ -112,7 +112,7 @@ namespace Config {
                     break;
                 }
                 default: {
-                    LOG(Log::WARN, "Too many arguments provided for gaps.");
+                    Log::logger->log(Log::WARN, "Too many arguments provided for gaps.");
                     *this = CCssGapData(toInt(varlist[0]), toInt(varlist[1]), toInt(varlist[2]), toInt(varlist[3]));
                     break;
                 }

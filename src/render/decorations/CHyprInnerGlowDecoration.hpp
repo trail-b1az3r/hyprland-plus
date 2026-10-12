@@ -1,7 +1,7 @@
 #pragma once
 
-#include "AnimatedDecorationGradient.hpp"
 #include "IHyprWindowDecoration.hpp"
+#include "../../config/shared/complex/ComplexDataTypes.hpp"
 
 class CHyprInnerGlowDecoration : public IHyprWindowDecoration {
   public:
@@ -12,7 +12,7 @@ class CHyprInnerGlowDecoration : public IHyprWindowDecoration {
 
     virtual void                       onPositioningReply(const SDecorationPositioningReply& reply);
 
-    virtual void                       draw(Render::CRenderContext& ctx, PHLMONITOR, float const& a, const Render::SWindowRenderPresentation& presentation);
+    virtual void                       draw(PHLMONITOR, float const& a);
 
     virtual eDecorationType            getDecorationType();
 
@@ -26,23 +26,16 @@ class CHyprInnerGlowDecoration : public IHyprWindowDecoration {
 
     virtual std::string                getDisplayName();
 
-    virtual void                       initializeAnimations() override;
-    virtual void                       updateState() override;
-    virtual void                       onWindowMap() override;
-    virtual void                       onWindowFocus() override;
-
-    void                               render(Render::CRenderContext& ctx, PHLMONITOR, float const& a, const Render::SWindowRenderPresentation& presentation);
+    void                               render(PHLMONITOR, float const& a);
 
   private:
-    bool         visible();
-    void         drawGlowInternal(Render::CRenderContext& ctx, const CBox& box, int round, float roundingPower, int range, const Config::CGradientValueData& grad, float a);
-    void         drawGlowInternal(Render::CRenderContext& ctx, const CBox& box, int round, float roundingPower, int range, const Config::CGradientValueData& grad1,
-                                  const Config::CGradientValueData& grad2, float lerp, float a);
+    bool visible();
+    void drawGlowInternal(const CBox& box, int round, float roundingPower, int range, const Config::CGradientValueData& grad, float a);
+    void drawGlowInternal(const CBox& box, int round, float roundingPower, int range, const Config::CGradientValueData& grad1, const Config::CGradientValueData& grad2, float lerp,
+                          float a);
 
     PHLWINDOWREF m_window;
 
-    CAnimatedDecorationGradient m_gradient;
-
-    Vector2D                    m_lastWindowPos;
-    Vector2D                    m_lastWindowSize;
+    Vector2D     m_lastWindowPos;
+    Vector2D     m_lastWindowSize;
 };

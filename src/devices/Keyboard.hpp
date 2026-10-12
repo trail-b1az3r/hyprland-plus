@@ -6,7 +6,7 @@ class CKeyboard : public IKeyboard {
   public:
     static SP<CKeyboard>              create(SP<Aquamarine::IKeyboard> keeb);
 
-    virtual bool                      isVirtual() const;
+    virtual bool                      isVirtual();
     virtual SP<Aquamarine::IKeyboard> aq();
 
   private:

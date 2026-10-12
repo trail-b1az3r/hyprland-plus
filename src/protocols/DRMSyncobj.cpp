@@ -21,13 +21,13 @@ WP<CSyncTimeline> CDRMSyncPointState::timeline() {
 
 UP<CSyncReleaser> CDRMSyncPointState::createSyncRelease() {
     if (m_releaseTaken)
-        LOG(Log::ERR, "CDRMSyncPointState: creating a sync releaser on an already created SyncRelease");
+        Log::logger->log(Log::ERR, "CDRMSyncPointState: creating a sync releaser on an already created SyncRelease");
 
     m_releaseTaken = true;
     return makeUnique<CSyncReleaser>(m_timeline, m_point);
 }
 
-WP<SReadableWaiter> CDRMSyncPointState::addWaiter(std::function<void()>&& waiter) {
+bool CDRMSyncPointState::addWaiter(std::function<void()>&& waiter) {
     m_acquireCommitted = true;
     return m_timeline->addWaiter(std::move(waiter), m_point, 0u);
 }
@@ -134,9 +134,12 @@ CDRMSyncobjTimelineResource::CDRMSyncobjTimelineResource(UP<CWpLinuxDrmSyncobjTi
 }
 
 WP<CDRMSyncobjTimelineResource> CDRMSyncobjTimelineResource::fromResource(wl_resource* res) {
-    auto resource = sc<CWpLinuxDrmSyncobjTimelineV1*>(wl_resource_get_user_data(res));
-    auto data     = resource ? sc<CDRMSyncobjTimelineResource*>(resource->data()) : nullptr;
-    return data ? data->m_self : WP<CDRMSyncobjTimelineResource>{};
+    for (const auto& r : PROTO::sync->m_timelines) {
+        if (r && r->m_resource && r->m_resource->resource() == res)
+            return r;
+    }
+
+    return {};
 }
 
 bool CDRMSyncobjTimelineResource::good() {
@@ -177,7 +180,7 @@ CDRMSyncobjManagerResource::CDRMSyncobjManagerResource(UP<CWpLinuxDrmSyncobjMana
 
         SURF->m_syncobj = RESOURCE;
 
-        LOG(Log::DEBUG, "New linux_syncobj at {:x} for surface {:x}", (uintptr_t)RESOURCE.get(), (uintptr_t)SURF.get());
+        LOGM(Log::DEBUG, "New linux_syncobj at {:x} for surface {:x}", (uintptr_t)RESOURCE.get(), (uintptr_t)SURF.get());
     });
 
     m_resource->setImportTimeline([this](CWpLinuxDrmSyncobjManagerV1* r, uint32_t id, int32_t fd) {
@@ -189,9 +192,7 @@ CDRMSyncobjManagerResource::CDRMSyncobjManagerResource(UP<CWpLinuxDrmSyncobjMana
             return;
         }
 
-        RESOURCE->m_self = RESOURCE;
-
-        LOG(Log::DEBUG, "New linux_drm_timeline at {:x}", (uintptr_t)RESOURCE.get());
+        LOGM(Log::DEBUG, "New linux_drm_timeline at {:x}", (uintptr_t)RESOURCE.get());
     });
 }
 
@@ -205,11 +206,11 @@ CDRMSyncobjProtocol::CDRMSyncobjProtocol(const wl_interface* iface, const int& v
     else if (g_pCompositor->m_drm.syncobjSupport)
         m_drmFD = g_pCompositor->m_drm.fd;
     else {
-        LOG(Log::ERR, "CDRMSyncobjProtocol: no nodes support explicit sync?");
+        LOGM(Log::ERR, "CDRMSyncobjProtocol: no nodes support explicit sync?");
         return;
     }
 
-    LOG(Log::DEBUG, "CDRMSyncobjProtocol: using fd {}", m_drmFD);
+    LOGM(Log::DEBUG, "CDRMSyncobjProtocol: using fd {}", m_drmFD);
 }
 
 void CDRMSyncobjProtocol::bindManager(wl_client* client, void* data, uint32_t ver, uint32_t id) {

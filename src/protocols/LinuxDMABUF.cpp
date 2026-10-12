@@ -39,14 +39,14 @@ CDMABUFFormatTable::CDMABUFFormatTable(SDMABUFTranche _rendererTranche, std::vec
     m_rendererTranche.indices.clear();
     for (auto const& fmt : m_rendererTranche.formats) {
         for (auto const& mod : fmt.modifiers) {
-            LOG(Log::TRACE, "Render format 0x{:x} ({}) with mod 0x{:x} ({})", fmt.drmFormat, NFormatUtils::drmFormatName(fmt.drmFormat), mod, NFormatUtils::drmModifierName(mod));
+            LOGM(Log::TRACE, "Render format 0x{:x} ({}) with mod 0x{:x} ({})", fmt.drmFormat, NFormatUtils::drmFormatName(fmt.drmFormat), mod, NFormatUtils::drmModifierName(mod));
             if (*PSKIP_NON_KMS && !m_monitorTranches.empty()) {
                 if (std::ranges::none_of(m_monitorTranches, [fmt, mod](const std::pair<PHLMONITORREF, SDMABUFTranche>& pair) {
                         return std::ranges::any_of(pair.second.formats, [fmt, mod](const SDRMFormat& format) {
                             return format.drmFormat == fmt.drmFormat && std::ranges::any_of(format.modifiers, [mod](uint64_t modifier) { return mod == modifier; });
                         });
                     })) {
-                    LOG(Log::TRACE, "    skipped");
+                    LOGM(Log::TRACE, "    skipped");
                     continue;
                 }
             }
@@ -70,8 +70,8 @@ CDMABUFFormatTable::CDMABUFFormatTable(SDMABUFTranche _rendererTranche, std::vec
         tranche.indices.clear();
         for (auto const& fmt : tranche.formats) {
             for (auto const& mod : fmt.modifiers) {
-                LOG(Log::TRACE, "[DMA] Monitor format 0x{:x} ({}) with mod 0x{:x} ({})", fmt.drmFormat, NFormatUtils::drmFormatName(fmt.drmFormat), mod,
-                    NFormatUtils::drmModifierName(mod));
+                LOGM(Log::TRACE, "[DMA] Monitor format 0x{:x} ({}) with mod 0x{:x} ({})", fmt.drmFormat, NFormatUtils::drmFormatName(fmt.drmFormat), mod,
+                     NFormatUtils::drmModifierName(mod));
                 // FIXME: recheck this. DRM_FORMAT_MOD_INVALID is allowed by the proto "For legacy support". DRM_FORMAT_MOD_LINEAR should be the most compatible mod
                 // apparently these can implode on planes, so don't use them
                 if (mod == DRM_FORMAT_MOD_INVALID || mod == DRM_FORMAT_MOD_LINEAR)
@@ -99,7 +99,7 @@ CDMABUFFormatTable::CDMABUFFormatTable(SDMABUFTranche _rendererTranche, std::vec
     auto arr = sc<SDMABUFFormatTableEntry*>(mmap(nullptr, m_tableSize, PROT_READ | PROT_WRITE, MAP_SHARED, fds[0].get(), 0));
 
     if (arr == MAP_FAILED) {
-        LOG(Log::ERR, "mmap failed");
+        LOGM(Log::ERR, "mmap failed");
         return;
     }
 
@@ -110,8 +110,8 @@ CDMABUFFormatTable::CDMABUFFormatTable(SDMABUFTranche _rendererTranche, std::vec
     m_tableFD = std::move(fds[1]);
 }
 
-CLinuxDMABuffer::CLinuxDMABuffer(uint32_t id, wl_client* client, const Aquamarine::SDMABUFAttrs& attrs, std::array<CFileDescriptor, 4> fds) {
-    m_buffer = makeShared<CDMABuffer>(id, client, attrs, std::move(fds));
+CLinuxDMABuffer::CLinuxDMABuffer(uint32_t id, wl_client* client, Aquamarine::SDMABUFAttrs attrs) {
+    m_buffer = makeShared<CDMABuffer>(id, client, attrs);
 
     m_buffer->m_resource->m_buffer = m_buffer;
 
@@ -121,7 +121,7 @@ CLinuxDMABuffer::CLinuxDMABuffer(uint32_t id, wl_client* client, const Aquamarin
     });
 
     if (!m_buffer->m_success)
-        LOG(Log::ERR, "Possibly compositor bug: buffer failed to create");
+        LOGM(Log::ERR, "Possibly compositor bug: buffer failed to create");
 }
 
 CLinuxDMABuffer::~CLinuxDMABuffer() {
@@ -143,11 +143,11 @@ CLinuxDMABUFParamsResource::CLinuxDMABUFParamsResource(UP<CZwpLinuxBufferParamsV
     m_resource->setOnDestroy([this](CZwpLinuxBufferParamsV1* r) { PROTO::linuxDma->destroyResource(this); });
     m_resource->setDestroy([this](CZwpLinuxBufferParamsV1* r) { PROTO::linuxDma->destroyResource(this); });
 
-    m_attrs.success = true;
+    m_attrs = makeShared<Aquamarine::SDMABUFAttrs>();
+
+    m_attrs->success = true;
 
     m_resource->setAdd([this](CZwpLinuxBufferParamsV1* r, int32_t fd, uint32_t plane, uint32_t offset, uint32_t stride, uint32_t modHi, uint32_t modLo) {
-        CFileDescriptor ownedFD{fd};
-
         if (m_used) {
             r->error(ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_ALREADY_USED, "Already used");
             return;
@@ -158,24 +158,23 @@ CLinuxDMABUFParamsResource::CLinuxDMABUFParamsResource(UP<CZwpLinuxBufferParamsV
             return;
         }
 
-        if (m_attrs.fds.at(plane) != -1) {
+        if (m_attrs->fds.at(plane) != -1) {
             r->error(ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_PLANE_IDX, "plane used");
             return;
         }
 
         const uint64_t modifier = (sc<uint64_t>(modHi) << 32) | modLo;
 
-        const bool     anyPlaneSet = std::ranges::any_of(m_attrs.fds, [](int planeFD) { return planeFD != -1; });
-        if (m_resource->version() >= 5 && anyPlaneSet && m_attrs.modifier != modifier) {
+        const bool     anyPlaneSet = std::ranges::any_of(m_attrs->fds, [](int planeFD) { return planeFD != -1; });
+        if (m_resource->version() >= 5 && anyPlaneSet && m_attrs->modifier != modifier) {
             r->error(ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INVALID_FORMAT, "planes have different modifiers");
             return;
         }
 
-        m_fds[plane]           = std::move(ownedFD);
-        m_attrs.fds[plane]     = m_fds[plane].get();
-        m_attrs.strides[plane] = stride;
-        m_attrs.offsets[plane] = offset;
-        m_attrs.modifier       = modifier;
+        m_attrs->fds[plane]     = fd;
+        m_attrs->strides[plane] = stride;
+        m_attrs->offsets[plane] = offset;
+        m_attrs->modifier       = modifier;
     });
 
     m_resource->setCreate([this](CZwpLinuxBufferParamsV1* r, int32_t w, int32_t h, uint32_t fmt, zwpLinuxBufferParamsV1Flags flags) {
@@ -186,20 +185,20 @@ CLinuxDMABUFParamsResource::CLinuxDMABUFParamsResource(UP<CZwpLinuxBufferParamsV
 
         if (flags > 0) {
             r->sendFailed();
-            LOG(Log::ERR, "DMABUF flags are not supported");
+            LOGM(Log::ERR, "DMABUF flags are not supported");
             return;
         }
 
         if (m_resource->version() >= 4 && std::ranges::none_of(PROTO::linuxDma->m_formatTable->m_rendererTranche.formats, [this, fmt](const auto format) {
-                return format.drmFormat == fmt && std::ranges::any_of(format.modifiers, [this](const auto mod) { return !mod || mod == m_attrs.modifier; });
+                return format.drmFormat == fmt && std::ranges::any_of(format.modifiers, [this](const auto mod) { return !mod || mod == m_attrs->modifier; });
             })) {
             r->error(ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INVALID_FORMAT, "format + modifier pair is not supported");
             return;
         }
 
-        m_attrs.size   = {w, h};
-        m_attrs.format = fmt;
-        m_attrs.planes = 4 - std::ranges::count(m_attrs.fds, -1);
+        m_attrs->size   = {w, h};
+        m_attrs->format = fmt;
+        m_attrs->planes = 4 - std::ranges::count(m_attrs->fds, -1);
 
         create(0);
     });
@@ -212,13 +211,13 @@ CLinuxDMABUFParamsResource::CLinuxDMABUFParamsResource(UP<CZwpLinuxBufferParamsV
 
         if (flags > 0) {
             r->sendFailed();
-            LOG(Log::ERR, "DMABUF flags are not supported");
+            LOGM(Log::ERR, "DMABUF flags are not supported");
             return;
         }
 
-        m_attrs.size   = {w, h};
-        m_attrs.format = fmt;
-        m_attrs.planes = 4 - std::ranges::count(m_attrs.fds, -1);
+        m_attrs->size   = {w, h};
+        m_attrs->format = fmt;
+        m_attrs->planes = 4 - std::ranges::count(m_attrs->fds, -1);
 
         create(id);
     });
@@ -232,26 +231,22 @@ void CLinuxDMABUFParamsResource::create(uint32_t id) {
     m_used = true;
 
     if UNLIKELY (!verify()) {
-        LOG(Log::ERR, "Failed creating a dmabuf: verify() said no");
+        LOGM(Log::ERR, "Failed creating a dmabuf: verify() said no");
         return; // if verify failed, we errored the resource.
     }
 
     if UNLIKELY (!commence()) {
-        LOG(Log::ERR, "Failed creating a dmabuf: commence() said no");
+        LOGM(Log::ERR, "Failed creating a dmabuf: commence() said no");
         m_resource->sendFailed();
         return;
     }
 
-    LOG(Log::DEBUG, "Creating a dmabuf, with id {}: size {}, fmt {}, planes {}", id, m_attrs.size, NFormatUtils::drmFormatName(m_attrs.format), m_attrs.planes);
-    for (int i = 0; i < m_attrs.planes; ++i) {
-        LOG(Log::DEBUG, " | plane {}: mod {} fd {} stride {} offset {}", i, m_attrs.modifier, m_attrs.fds[i], m_attrs.strides[i], m_attrs.offsets[i]);
+    LOGM(Log::DEBUG, "Creating a dmabuf, with id {}: size {}, fmt {}, planes {}", id, m_attrs->size, NFormatUtils::drmFormatName(m_attrs->format), m_attrs->planes);
+    for (int i = 0; i < m_attrs->planes; ++i) {
+        LOGM(Log::DEBUG, " | plane {}: mod {} fd {} stride {} offset {}", i, m_attrs->modifier, m_attrs->fds[i], m_attrs->strides[i], m_attrs->offsets[i]);
     }
 
-    auto& buf = PROTO::linuxDma->m_buffers.emplace_back(makeUnique<CLinuxDMABuffer>(id, m_resource->client(), m_attrs, std::move(m_fds)));
-
-    // The buffer now owns the planes, even if construction failed.
-    m_attrs.fds.fill(-1);
-    m_attrs.planes = 0;
+    auto& buf = PROTO::linuxDma->m_buffers.emplace_back(makeUnique<CLinuxDMABuffer>(id, m_resource->client(), *m_attrs));
 
     if UNLIKELY (!buf->good() || !buf->m_buffer->m_success) {
         m_resource->sendFailed();
@@ -269,16 +264,16 @@ bool CLinuxDMABUFParamsResource::commence() {
     if (!PROTO::linuxDma->m_mainDeviceFD.isValid())
         return true;
 
-    for (int i = 0; i < m_attrs.planes; i++) {
+    for (int i = 0; i < m_attrs->planes; i++) {
         uint32_t handle = 0;
 
-        if (drmPrimeFDToHandle(PROTO::linuxDma->m_mainDeviceFD.get(), m_attrs.fds.at(i), &handle)) {
-            LOG(Log::ERR, "Failed to import dmabuf fd {} on plane {}", m_attrs.fds.at(i), i);
+        if (drmPrimeFDToHandle(PROTO::linuxDma->m_mainDeviceFD.get(), m_attrs->fds.at(i), &handle)) {
+            LOGM(Log::ERR, "Failed to import dmabuf fd {} on plane {}", m_attrs->fds.at(i), i);
             return false;
         }
 
         if (drmCloseBufferHandle(PROTO::linuxDma->m_mainDeviceFD.get(), handle)) {
-            LOG(Log::ERR, "Failed to close dmabuf handle");
+            LOGM(Log::ERR, "Failed to close dmabuf handle");
             return false;
         }
     }
@@ -287,18 +282,18 @@ bool CLinuxDMABUFParamsResource::commence() {
 }
 
 bool CLinuxDMABUFParamsResource::verify() {
-    if UNLIKELY (m_attrs.planes <= 0) {
+    if UNLIKELY (m_attrs->planes <= 0) {
         m_resource->error(ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INCOMPLETE, "No planes added");
         return false;
     }
 
-    if UNLIKELY (m_attrs.fds.at(0) < 0) {
+    if UNLIKELY (m_attrs->fds.at(0) < 0) {
         m_resource->error(ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INCOMPLETE, "No plane 0");
         return false;
     }
 
     bool empty = false;
-    for (auto const& plane : m_attrs.fds) {
+    for (auto const& plane : m_attrs->fds) {
         if (empty && plane != -1) {
             m_resource->error(ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INVALID_FORMAT, "Gap in planes");
             return false;
@@ -310,17 +305,17 @@ bool CLinuxDMABUFParamsResource::verify() {
         }
     }
 
-    if UNLIKELY (m_attrs.size.x < 1 || m_attrs.size.y < 1) {
+    if UNLIKELY (m_attrs->size.x < 1 || m_attrs->size.y < 1) {
         m_resource->error(ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INVALID_DIMENSIONS, "x/y < 1");
         return false;
     }
 
-    for (size_t i = 0; i < sc<size_t>(m_attrs.planes); ++i) {
-        const auto computedSize = sc<uint64_t>(m_attrs.offsets.at(i)) + sc<uint64_t>(m_attrs.strides.at(i)) * m_attrs.size.y;
+    for (size_t i = 0; i < sc<size_t>(m_attrs->planes); ++i) {
+        const auto computedSize = sc<uint64_t>(m_attrs->offsets.at(i)) + sc<uint64_t>(m_attrs->strides.at(i)) * m_attrs->size.y;
         if (computedSize > UINT32_MAX) {
             m_resource->error(ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_OUT_OF_BOUNDS,
-                              std::format("size overflow on plane {}: offset {} + stride {} * height {} = {}, overflows UINT32_MAX", i, sc<uint64_t>(m_attrs.offsets.at(i)),
-                                          sc<uint64_t>(m_attrs.strides.at(i)), m_attrs.size.y, computedSize));
+                              std::format("size overflow on plane {}: offset {} + stride {} * height {} = {}, overflows UINT32_MAX", i, sc<uint64_t>(m_attrs->offsets.at(i)),
+                                          sc<uint64_t>(m_attrs->strides.at(i)), m_attrs->size.y, computedSize));
             return false;
         }
     }
@@ -451,7 +446,7 @@ CLinuxDMABufV1Protocol::CLinuxDMABufV1Protocol(const wl_interface* iface, const 
         auto dev        = devIDFromFD(rendererFD);
 
         if (!dev.has_value()) {
-            LOG(Log::ERR, "failed to get drm dev, disabling linux dmabuf");
+            LOGM(Log::ERR, "failed to get drm dev, disabling linux dmabuf");
             removeGlobal();
             return;
         }
@@ -508,7 +503,7 @@ CLinuxDMABufV1Protocol::CLinuxDMABufV1Protocol(const wl_interface* iface, const 
 
         drmDevice* device = nullptr;
         if (drmGetDeviceFromDevId(m_mainDevice, 0, &device) != 0) {
-            LOG(Log::ERR, "failed to get drm dev, disabling linux dmabuf");
+            LOGM(Log::ERR, "failed to get drm dev, disabling linux dmabuf");
             removeGlobal();
             return;
         }
@@ -518,7 +513,7 @@ CLinuxDMABufV1Protocol::CLinuxDMABufV1Protocol(const wl_interface* iface, const 
             m_mainDeviceFD = CFileDescriptor{fcntl(g_pCompositor->m_drmRenderNode.fd, F_DUPFD_CLOEXEC, 0)};
             drmFreeDevice(&device);
             if (!m_mainDeviceFD.isValid()) {
-                LOG(Log::ERR, "failed to open rendernode, disabling linux dmabuf");
+                LOGM(Log::ERR, "failed to open rendernode, disabling linux dmabuf");
                 removeGlobal();
                 return;
             }
@@ -531,12 +526,12 @@ CLinuxDMABufV1Protocol::CLinuxDMABufV1Protocol(const wl_interface* iface, const 
             m_mainDeviceFD   = CFileDescriptor{open(name, O_RDWR | O_CLOEXEC)};
             drmFreeDevice(&device);
             if (!m_mainDeviceFD.isValid()) {
-                LOG(Log::ERR, "failed to open drm dev, disabling linux dmabuf");
+                LOGM(Log::ERR, "failed to open drm dev, disabling linux dmabuf");
                 removeGlobal();
                 return;
             }
         } else {
-            LOG(Log::ERR, "DRM device {} has no render node, disabling linux dmabuf checks", device->nodes[DRM_NODE_PRIMARY] ? device->nodes[DRM_NODE_PRIMARY] : "null");
+            LOGM(Log::ERR, "DRM device {} has no render node, disabling linux dmabuf checks", device->nodes[DRM_NODE_PRIMARY] ? device->nodes[DRM_NODE_PRIMARY] : "null");
             drmFreeDevice(&device);
         }
     });
@@ -546,7 +541,7 @@ void CLinuxDMABufV1Protocol::resetFormatTable() {
     if (!m_formatTable)
         return;
 
-    LOG(Log::DEBUG, "Resetting format table");
+    LOGM(Log::DEBUG, "Resetting format table");
 
     // this might be a big copy
     auto newFormatTable = makeUnique<CDMABUFFormatTable>(m_formatTable->m_rendererTranche, m_formatTable->m_monitorTranches);
@@ -616,12 +611,12 @@ void CLinuxDMABufV1Protocol::updateScanoutTranche(SP<CWLSurfaceResource> surface
     }
 
     if (!feedbackResource) {
-        LOG(Log::DEBUG, "updateScanoutTranche: surface has no dmabuf_feedback");
+        LOGM(Log::DEBUG, "updateScanoutTranche: surface has no dmabuf_feedback");
         return;
     }
 
     if (!pMonitor) {
-        LOG(Log::DEBUG, "updateScanoutTranche: resetting feedback");
+        LOGM(Log::DEBUG, "updateScanoutTranche: resetting feedback");
         feedbackResource->sendDefaultFeedback();
         return;
     }
@@ -630,13 +625,13 @@ void CLinuxDMABufV1Protocol::updateScanoutTranche(SP<CWLSurfaceResource> surface
         std::ranges::find_if(m_formatTable->m_monitorTranches, [pMonitor](std::pair<PHLMONITORREF, SDMABUFTranche> pair) { return pair.first == pMonitor; });
 
     if (monitorTranchePair == m_formatTable->m_monitorTranches.end()) {
-        LOG(Log::DEBUG, "updateScanoutTranche: monitor has no tranche");
+        LOGM(Log::DEBUG, "updateScanoutTranche: monitor has no tranche");
         return;
     }
 
     auto& monitorTranche = (*monitorTranchePair).second;
 
-    LOG(Log::DEBUG, "updateScanoutTranche: sending a scanout tranche");
+    LOGM(Log::DEBUG, "updateScanoutTranche: sending a scanout tranche");
 
     struct wl_array deviceArr = {
         .size = sizeof(m_mainDevice),

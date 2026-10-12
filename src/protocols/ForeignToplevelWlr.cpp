@@ -7,7 +7,7 @@
 #include "../desktop/state/FocusState.hpp"
 #include "../desktop/state/GlobalWindowController.hpp"
 #include "../render/Renderer.hpp"
-#include "../ipc/s2/S2.hpp"
+#include "../managers/EventManager.hpp"
 #include "../event/EventBus.hpp"
 #include "../state/MonitorState.hpp"
 
@@ -38,21 +38,35 @@ CForeignToplevelHandleWlr::CForeignToplevelHandleWlr(SP<CZwlrForeignToplevelHand
         if UNLIKELY (!PWINDOW)
             return;
 
-        std::optional<MONITORID> monitorID;
+        if UNLIKELY (PWINDOW->m_suppressedEvents & Desktop::View::SUPPRESS_FULLSCREEN)
+            return;
+
+        if UNLIKELY (!PWINDOW->m_isMapped) {
+            PWINDOW->m_wantsInitialFullscreen = true;
+            return;
+        }
+
         if (output) {
             const auto OUTPUT = CWLOutputResource::fromResource(output);
             if UNLIKELY (!OUTPUT) {
-                LOG(Log::ERR, "Client requested foreign toplevel output on an invalid output resource");
+                LOGM(Log::ERR, "Client requested foreign toplevel output on an invalid output resource");
                 return;
             }
 
-            if (!OUTPUT->m_monitor.expired())
-                monitorID = OUTPUT->m_monitor.lock()->m_id;
+            const auto wpMonitor = OUTPUT->m_monitor;
+
+            if (!wpMonitor.expired()) {
+                const auto monitor = wpMonitor.lock();
+
+                if (PWINDOW->m_workspace != monitor->m_activeWorkspace) {
+                    Desktop::globalWindowController()->moveWindowToWorkspace(PWINDOW, monitor->m_activeWorkspace);
+                    Desktop::focusState()->rawMonitorFocus(monitor);
+                }
+            }
         }
 
-        PWINDOW->requestClientFullscreen({.fullscreen = true, .fullscreenMonitor = monitorID, .origin = Desktop::View::SClientFullscreenRequest::ORIGIN_FOREIGN_TOPLEVEL});
-        if (PWINDOW->mapped())
-            g_pHyprRenderer->damageWindow(PWINDOW);
+        Fullscreen::controller()->setFullscreenMode(PWINDOW, std::nullopt, Fullscreen::FSMODE_FULLSCREEN);
+        g_pHyprRenderer->damageWindow(PWINDOW);
     });
 
     m_resource->setUnsetFullscreen([this](CZwlrForeignToplevelHandleV1* p) {
@@ -61,7 +75,13 @@ CForeignToplevelHandleWlr::CForeignToplevelHandleWlr(SP<CZwlrForeignToplevelHand
         if UNLIKELY (!PWINDOW)
             return;
 
-        PWINDOW->requestClientFullscreen({.fullscreen = false, .origin = Desktop::View::SClientFullscreenRequest::ORIGIN_FOREIGN_TOPLEVEL});
+        if UNLIKELY (PWINDOW->m_suppressedEvents & Desktop::View::SUPPRESS_FULLSCREEN)
+            return;
+
+        // if window is client FSMODE_FULLSCREEN, unFS the window. If it isn't, let the window keep its FS mode
+        const auto WINDOW_CLIENT_FS_MODE = Fullscreen::controller()->getFullscreenModes(PWINDOW).client;
+        if (WINDOW_CLIENT_FS_MODE == Fullscreen::FSMODE_FULLSCREEN)
+            Fullscreen::controller()->setFullscreenMode(PWINDOW, std::nullopt, Fullscreen::FSMODE_NONE);
     });
 
     m_resource->setSetMaximized([this](CZwlrForeignToplevelHandleV1* p) {
@@ -70,7 +90,14 @@ CForeignToplevelHandleWlr::CForeignToplevelHandleWlr(SP<CZwlrForeignToplevelHand
         if UNLIKELY (!PWINDOW)
             return;
 
-        PWINDOW->requestClientFullscreen({.maximized = true, .origin = Desktop::View::SClientFullscreenRequest::ORIGIN_FOREIGN_TOPLEVEL});
+        if UNLIKELY (PWINDOW->m_suppressedEvents & Desktop::View::SUPPRESS_MAXIMIZE)
+            return;
+
+        if UNLIKELY (!PWINDOW->m_isMapped) {
+            PWINDOW->m_wantsInitialFullscreen = true;
+            return;
+        }
+        Fullscreen::controller()->setFullscreenMode(PWINDOW, std::nullopt, Fullscreen::FSMODE_MAXIMIZED);
     });
 
     m_resource->setUnsetMaximized([this](CZwlrForeignToplevelHandleV1* p) {
@@ -79,7 +106,12 @@ CForeignToplevelHandleWlr::CForeignToplevelHandleWlr(SP<CZwlrForeignToplevelHand
         if UNLIKELY (!PWINDOW)
             return;
 
-        PWINDOW->requestClientFullscreen({.maximized = false, .origin = Desktop::View::SClientFullscreenRequest::ORIGIN_FOREIGN_TOPLEVEL});
+        if UNLIKELY (PWINDOW->m_suppressedEvents & Desktop::View::SUPPRESS_MAXIMIZE)
+            return;
+
+        // If window's client FS state is maximised, unmaximise it. If it isn't, let it keep its FS state
+        if (Fullscreen::controller()->getFullscreenModes(PWINDOW).client == Fullscreen::FSMODE_MAXIMIZED)
+            Fullscreen::controller()->setFullscreenMode(PWINDOW, std::nullopt, Fullscreen::FSMODE_NONE);
     });
 
     m_resource->setSetMinimized([this](CZwlrForeignToplevelHandleV1* p) {
@@ -88,11 +120,10 @@ CForeignToplevelHandleWlr::CForeignToplevelHandleWlr(SP<CZwlrForeignToplevelHand
         if UNLIKELY (!PWINDOW)
             return;
 
-        if UNLIKELY (!PWINDOW->mapped())
+        if UNLIKELY (!PWINDOW->m_isMapped)
             return;
 
-        IPC::Socket2::sock()->postEvent({.event = "minimized", .data = std::format("{:x},1", rc<uintptr_t>(PWINDOW.get()))});
-        Event::bus()->m_events.window.minimize.emit(PWINDOW, true);
+        g_pEventManager->postEvent(SHyprIPCEvent{.event = "minimized", .data = std::format("{:x},1", rc<uintptr_t>(PWINDOW.get()))});
     });
 
     m_resource->setUnsetMinimized([this](CZwlrForeignToplevelHandleV1* p) {
@@ -101,11 +132,10 @@ CForeignToplevelHandleWlr::CForeignToplevelHandleWlr(SP<CZwlrForeignToplevelHand
         if UNLIKELY (!PWINDOW)
             return;
 
-        if UNLIKELY (!PWINDOW->mapped())
+        if UNLIKELY (!PWINDOW->m_isMapped)
             return;
 
-        IPC::Socket2::sock()->postEvent({.event = "minimized", .data = std::format("{:x},0", rc<uintptr_t>(PWINDOW.get()))});
-        Event::bus()->m_events.window.minimize.emit(PWINDOW, false);
+        g_pEventManager->postEvent(SHyprIPCEvent{.event = "minimized", .data = std::format("{:x},0", rc<uintptr_t>(PWINDOW.get()))});
     });
 
     m_resource->setClose([this](CZwlrForeignToplevelHandleV1* p) {
@@ -162,7 +192,7 @@ void CForeignToplevelHandleWlr::sendMonitor(PHLMONITOR pMonitor) {
 void CForeignToplevelHandleWlr::sendState() {
     const auto PWINDOW = m_window.lock();
 
-    if UNLIKELY (!PWINDOW || !PWINDOW->m_workspace || !PWINDOW->mapped())
+    if UNLIKELY (!PWINDOW || !PWINDOW->m_workspace || !PWINDOW->m_isMapped)
         return;
 
     wl_array state;
@@ -195,7 +225,7 @@ CForeignToplevelWlrManager::CForeignToplevelWlrManager(SP<CZwlrForeignToplevelMa
     m_resource->setStop([this](CZwlrForeignToplevelManagerV1* h) {
         m_resource->sendFinished();
         m_finished = true;
-        LOG(Log::DEBUG, "CForeignToplevelWlrManager: finished");
+        LOGM(Log::DEBUG, "CForeignToplevelWlrManager: finished");
         PROTO::foreignToplevelWlr->onManagerResourceDestroy(this);
     });
 
@@ -217,16 +247,16 @@ void CForeignToplevelWlrManager::onMap(PHLWINDOW pWindow) {
         makeShared<CForeignToplevelHandleWlr>(makeShared<CZwlrForeignToplevelHandleV1>(m_resource->client(), m_resource->version(), 0), pWindow));
 
     if UNLIKELY (!NEWHANDLE->good()) {
-        LOG(Log::ERR, "Couldn't create a foreign handle");
+        LOGM(Log::ERR, "Couldn't create a foreign handle");
         m_resource->noMemory();
         PROTO::foreignToplevelWlr->m_handles.pop_back();
         return;
     }
 
-    LOG(Log::DEBUG, "Newly mapped window {:016x}", (uintptr_t)pWindow.get());
+    LOGM(Log::DEBUG, "Newly mapped window {:016x}", (uintptr_t)pWindow.get());
     m_resource->sendToplevel(NEWHANDLE->m_resource.get());
-    NEWHANDLE->m_resource->sendAppId(pWindow->metadata().appID().c_str());
-    NEWHANDLE->m_resource->sendTitle(pWindow->metadata().title().c_str());
+    NEWHANDLE->m_resource->sendAppId(pWindow->m_class.c_str());
+    NEWHANDLE->m_resource->sendTitle(pWindow->m_title.c_str());
     if LIKELY (const auto PMONITOR = pWindow->m_monitor.lock(); PMONITOR)
         NEWHANDLE->sendMonitor(PMONITOR);
     NEWHANDLE->sendState();
@@ -249,7 +279,7 @@ void CForeignToplevelWlrManager::onTitle(PHLWINDOW pWindow) {
     if UNLIKELY (!H || H->m_closed)
         return;
 
-    H->m_resource->sendTitle(pWindow->metadata().title().c_str());
+    H->m_resource->sendTitle(pWindow->m_title.c_str());
     H->m_resource->sendDone();
 }
 
@@ -261,7 +291,7 @@ void CForeignToplevelWlrManager::onClass(PHLWINDOW pWindow) {
     if UNLIKELY (!H || H->m_closed)
         return;
 
-    H->m_resource->sendAppId(pWindow->metadata().appID().c_str());
+    H->m_resource->sendAppId(pWindow->m_class.c_str());
     H->m_resource->sendDone();
 }
 
@@ -385,7 +415,7 @@ void CForeignToplevelWlrProtocol::bindManager(wl_client* client, void* data, uin
     const auto RESOURCE = m_managers.emplace_back(makeUnique<CForeignToplevelWlrManager>(makeShared<CZwlrForeignToplevelManagerV1>(client, ver, id))).get();
 
     if UNLIKELY (!RESOURCE->good()) {
-        LOG(Log::ERR, "Couldn't create a foreign list");
+        LOGM(Log::ERR, "Couldn't create a foreign list");
         wl_client_post_no_memory(client);
         m_managers.pop_back();
         return;
@@ -406,5 +436,5 @@ PHLWINDOW CForeignToplevelWlrProtocol::windowFromHandleResource(wl_resource* res
 }
 
 bool CForeignToplevelWlrProtocol::windowValidForForeign(PHLWINDOW pWindow) {
-    return validMapped(pWindow) && !pWindow->backend().traits().overrideRedirect;
+    return validMapped(pWindow) && !pWindow->isX11OverrideRedirect();
 }

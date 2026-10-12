@@ -6,12 +6,12 @@
 #include "../defines.hpp"
 #include "../desktop/DesktopTypes.hpp"
 
-class IHyprWindowDecoration;
-
 enum eAVarDamagePolicy : int8_t {
     AVARDAMAGE_NONE   = -1,
     AVARDAMAGE_ENTIRE = 0,
-    AVARDAMAGE_DECORATION,
+    AVARDAMAGE_BORDER,
+    AVARDAMAGE_SHADOW,
+    AVARDAMAGE_GLOW
 };
 
 enum eAnimatedVarType : int8_t {
@@ -57,12 +57,11 @@ template <class T>
 concept Animable = OneOf<T, Vector2D, float, CHyprColor>;
 
 struct SAnimationContext {
-    PHLWINDOWREF              pWindow;
-    PHLWORKSPACEREF           pWorkspace;
-    PHLLSREF                  pLayer;
-    WP<IHyprWindowDecoration> pDecoration;
+    PHLWINDOWREF      pWindow;
+    PHLWORKSPACEREF   pWorkspace;
+    PHLLSREF          pLayer;
 
-    eAVarDamagePolicy         eDamagePolicy = AVARDAMAGE_NONE;
+    eAVarDamagePolicy eDamagePolicy = AVARDAMAGE_NONE;
 };
 
 template <Animable VarType>

@@ -173,13 +173,11 @@ inline std::map<std::string, std::shared_ptr<CTestCase>> testCases;
     } while (0)
 
 #define EXPECT_NOT(expr, val)                                                                                                                                                      \
-    do {                                                                                                                                                                           \
-        if (const auto RESULT = expr; RESULT == (val)) {                                                                                                                           \
-            MARK_TEST_FAILED("{}, expected not {}, got {}", #expr, val, RESULT);                                                                                                   \
-        } else {                                                                                                                                                                   \
-            LOG_OK("{}. Got {}", #expr, val);                                                                                                                                      \
-        }                                                                                                                                                                          \
-    } while (0)
+    if (const auto RESULT = expr; RESULT == (val)) {                                                                                                                               \
+        MARK_TEST_FAILED("{}, expected not {}, got {}", #expr, val, RESULT);                                                                                                       \
+    } else {                                                                                                                                                                       \
+        LOG_OK("{}. Got {}", #expr, val);                                                                                                                                          \
+    }
 
 #define EXPECT_VECTOR2D(expr, val)                                                                                                                                                 \
     do {                                                                                                                                                                           \

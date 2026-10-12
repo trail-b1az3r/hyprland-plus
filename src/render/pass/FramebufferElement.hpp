@@ -11,9 +11,9 @@ class CFramebufferElement : public IPassElement {
     CFramebufferElement(const SFramebufferElementData& data_);
     virtual ~CFramebufferElement() = default;
 
-    virtual bool        needsLiveBlur(Render::CRenderContext& ctx);
-    virtual bool        needsPrecomputeBlur(Render::CRenderContext& ctx);
-    virtual bool        undiscardable(Render::CRenderContext& ctx);
+    virtual bool        needsLiveBlur();
+    virtual bool        needsPrecomputeBlur();
+    virtual bool        undiscardable();
 
     virtual const char* passName() {
         return "CFramebufferElement";

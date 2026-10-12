@@ -11,8 +11,8 @@ uniform float     brightness;
 
 #include "defines.h"
 #if USE_CM
-const int sourceTF = SOURCE_TF;
-const int targetTF = TARGET_TF;
+uniform int sourceTF; // eTransferFunction
+uniform int targetTF; // eTransferFunction
 #include "CM.glsl"
 #endif
 

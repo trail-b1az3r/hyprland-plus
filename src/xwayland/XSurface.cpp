@@ -2,6 +2,7 @@
 #include "XWayland.hpp"
 #include "../protocols/XWaylandShell.hpp"
 #include "../protocols/core/Compositor.hpp"
+#include "../managers/ANRManager.hpp"
 #include "../helpers/time/Time.hpp"
 
 #ifndef NO_XWAYLAND
@@ -129,7 +130,7 @@ void CXWaylandSurface::map() {
     m_mapped = true;
     m_surface->map();
 
-    LOG(Log::DEBUG, "XWayland surface {:x} mapping", rc<uintptr_t>(this));
+    Log::logger->log(Log::DEBUG, "XWayland surface {:x} mapping", rc<uintptr_t>(this));
 
     m_events.map.emit();
 
@@ -149,7 +150,7 @@ void CXWaylandSurface::unmap() {
     m_events.unmap.emit();
     m_surface->unmap();
 
-    LOG(Log::DEBUG, "XWayland surface {:x} unmapping", rc<uintptr_t>(this));
+    Log::logger->log(Log::DEBUG, "XWayland surface {:x} unmapping", rc<uintptr_t>(this));
 
     g_pXWayland->m_wm->updateClientList();
 }
@@ -159,17 +160,17 @@ void CXWaylandSurface::considerMap() {
         return;
 
     if (!m_surface) {
-        LOG(Log::DEBUG, "XWayland surface: considerMap, nope, no surface");
+        Log::logger->log(Log::DEBUG, "XWayland surface: considerMap, nope, no surface");
         return;
     }
 
     if (m_surface->m_current.texture) {
-        LOG(Log::DEBUG, "XWayland surface: considerMap, sure, we have a buffer");
+        Log::logger->log(Log::DEBUG, "XWayland surface: considerMap, sure, we have a buffer");
         map();
         return;
     }
 
-    LOG(Log::DEBUG, "XWayland surface: considerMap, nope, we don't have a buffer");
+    Log::logger->log(Log::DEBUG, "XWayland surface: considerMap, nope, we don't have a buffer");
 }
 
 bool CXWaylandSurface::wantsFocus() {
@@ -290,8 +291,8 @@ void CXWaylandSurface::ping() {
     bool supportsPing = std::ranges::find(m_protocols, HYPRATOMS["_NET_WM_PING"]) != m_protocols.end();
 
     if (!supportsPing) {
-        LOG(Log::TRACE, "CXWaylandSurface: XID {} does not support ping, just sending an instant reply", m_xID);
-        m_events.pong.emit();
+        Log::logger->log(Log::TRACE, "CXWaylandSurface: XID {} does not support ping, just sending an instant reply", m_xID);
+        g_pANRManager->onResponse(m_self.lock());
         return;
     }
 

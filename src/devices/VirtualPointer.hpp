@@ -8,7 +8,7 @@ class CVirtualPointer : public IPointer {
   public:
     static SP<CVirtualPointer>       create(SP<CVirtualPointerV1Resource> resource);
 
-    virtual bool                     isVirtual() const;
+    virtual bool                     isVirtual();
     virtual SP<Aquamarine::IPointer> aq();
 
   private:

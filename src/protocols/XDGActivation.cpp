@@ -1,7 +1,6 @@
 #include "XDGActivation.hpp"
 #include "../managers/TokenManager.hpp"
 #include "../Compositor.hpp"
-#include "../managers/SeatManager.hpp"
 #include "core/Compositor.hpp"
 #include <algorithm>
 
@@ -17,31 +16,18 @@ CXDGActivationToken::CXDGActivationToken(SP<CXdgActivationTokenV1> resource_) : 
     m_resource->setSetAppId([this](CXdgActivationTokenV1* r, const char* appid) { m_appID = appid; });
 
     m_resource->setCommit([this](CXdgActivationTokenV1* r) {
-        auto rej = [this] {
-            // is this fucking correct? Or should we just never send done???
-            m_resource->sendDone("");
-        };
-
         // TODO: should we send a protocol error of already_used here
         // if it was used? the protocol spec doesn't say _when_ it should be sent...
         if UNLIKELY (m_committed) {
-            LOG(Log::WARN, "possible protocol error, two commits from one token, rejecting");
-            rej();
+            LOGM(Log::WARN, "possible protocol error, two commits from one token. Ignoring.");
             return;
         }
 
         m_committed = true;
-
-        if UNLIKELY (!m_serial || !g_pSeatManager->serialValid(g_pSeatManager->seatResourceForClient(m_resource->client()), m_serial)) {
-            LOG(Log::WARN, "invalid serial {} for activation token, rejecting", m_serial);
-            rej();
-            return;
-        }
-
         // send done with a new token
         m_token = g_pTokenManager->registerNewToken({}, std::chrono::months{12});
 
-        LOG(Log::DEBUG, "assigned new xdg-activation token {}", m_token);
+        LOGM(Log::DEBUG, "assigned new xdg-activation token {}", m_token);
 
         m_resource->sendDone(m_token.c_str());
 
@@ -84,7 +70,7 @@ void CXDGActivationProtocol::bindManager(wl_client* client, void* data, uint32_t
         auto TOKEN = std::ranges::find_if(m_sentTokens, [token](const auto& t) { return t.token == token; });
 
         if UNLIKELY (TOKEN == m_sentTokens.end()) {
-            LOG(Log::WARN, "activate event for non-existent token {}??", token);
+            LOGM(Log::WARN, "activate event for non-existent token {}??", token);
             return;
         }
 
@@ -95,7 +81,7 @@ void CXDGActivationProtocol::bindManager(wl_client* client, void* data, uint32_t
         const auto             PWINDOW = Desktop::viewState()->query().type(Desktop::View::VIEW_TYPE_WINDOW).surface(surf).runWindow();
 
         if UNLIKELY (!PWINDOW) {
-            LOG(Log::WARN, "activate event for non-window or gone surface with token {}, ignoring", token);
+            LOGM(Log::WARN, "activate event for non-window or gone surface with token {}, ignoring", token);
             return;
         }
 

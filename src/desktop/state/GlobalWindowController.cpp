@@ -1,13 +1,10 @@
 #include "GlobalWindowController.hpp"
 
 #include "WindowState.hpp"
-#include "../view/window/Window.hpp"
-#include "../view/window/WindowGroupMembership.hpp"
-#include "../view/window/WindowPresentation.hpp"
+#include "../view/Window.hpp"
 #include "../view/Group.hpp"
 #include "../../output/Monitor.hpp"
 #include "../../layout/LayoutManager.hpp"
-#include "../../layout/target/Target.hpp"
 #include "../../managers/fullscreen/FullscreenController.hpp"
 
 using namespace Desktop;
@@ -19,19 +16,19 @@ UP<CGlobalWindowController>& Desktop::globalWindowController() {
 
 void CGlobalWindowController::updateAllWindowsDecorations() const {
     for (auto const& w : Desktop::windowState()->windows()) {
-        if (!w->mapped())
+        if (!w->m_isMapped)
             continue;
 
-        w->presentation().refreshValues();
+        w->updateDecorationValues();
     }
 }
 
 void CGlobalWindowController::updateSuspendedStates() const {
     for (auto const& w : Desktop::windowState()->windows()) {
-        if (!w->mapped())
+        if (!w->m_isMapped)
             continue;
 
-        w->setSuspended(w->isHidden() || !w->m_workspace || !w->m_workspace->visible());
+        w->setSuspended(w->isHidden() || !w->m_workspace || !w->m_workspace->isVisible());
     }
 }
 
@@ -39,7 +36,7 @@ void CGlobalWindowController::moveWindowToWorkspace(PHLWINDOW pWindow, PHLWORKSP
     if (!pWindow || !pWorkspace)
         return;
 
-    if ((pWindow->m_state & Desktop::View::WINDOW_STATE_PINNED) && pWorkspace->type() == Workspace::eWorkspaceType::SPECIAL)
+    if (pWindow->m_pinned && pWorkspace->m_isSpecialWorkspace)
         return;
 
     if (pWindow->m_workspace == pWorkspace)
@@ -48,7 +45,7 @@ void CGlobalWindowController::moveWindowToWorkspace(PHLWINDOW pWindow, PHLWORKSP
     const bool FULLSCREEN     = Fullscreen::controller()->isFullscreen(pWindow);
     const auto FULLSCREENMODE = Fullscreen::controller()->getFullscreenModes(pWindow).internal;
     const auto LAYOUT_AWARE   = FULLSCREEN ? Fullscreen::controller()->layoutManagedFS(pWindow) : false;
-    const bool WASVISIBLE     = pWindow->m_workspace && pWindow->m_workspace->visible();
+    const bool WASVISIBLE     = pWindow->m_workspace && pWindow->m_workspace->isVisible();
 
     if (FULLSCREEN)
         Fullscreen::controller()->setFullscreenMode(pWindow, Fullscreen::FSMODE_NONE);
@@ -62,22 +59,22 @@ void CGlobalWindowController::moveWindowToWorkspace(PHLWINDOW pWindow, PHLWORKSP
     pWindow->m_monitor = pWorkspace->m_monitor;
 
     static auto PGROUPONMOVETOWORKSPACE = CConfigValue<Config::INTEGER>("group:group_on_movetoworkspace");
-    if (*PGROUPONMOVETOWORKSPACE && visibleWindowsOnWorkspace == 1 && pFirstWindowOnWorkspace && pFirstWindowOnWorkspace != pWindow &&
-        pFirstWindowOnWorkspace->grouping().group() && pWindow->grouping().canBeGroupedInto(pFirstWindowOnWorkspace->grouping().group())) {
-        pFirstWindowOnWorkspace->grouping().group()->add(pWindow);
+    if (*PGROUPONMOVETOWORKSPACE && visibleWindowsOnWorkspace == 1 && pFirstWindowOnWorkspace && pFirstWindowOnWorkspace != pWindow && pFirstWindowOnWorkspace->m_group &&
+        pWindow->canBeGroupedInto(pFirstWindowOnWorkspace->m_group)) {
+        pFirstWindowOnWorkspace->m_group->add(pWindow);
     } else {
-        if (pWindow->isFloating())
+        if (pWindow->m_isFloating)
             pWindow->layoutTarget()->setPositionGlobal(CBox{POSTOMON + PWORKSPACEMONITOR->m_position, pWindow->layoutTarget()->position().size()});
     }
 
     pWindow->updateToplevel();
     pWindow->m_ruleApplicator->propertiesChanged(Desktop::Rule::RULE_PROP_ON_WORKSPACE);
-    pWindow->presentation().uncacheDecorations();
+    pWindow->uncacheWindowDecos();
 
-    if (pWindow->grouping().group())
-        pWindow->grouping().group()->updateWorkspace(pWorkspace);
+    if (pWindow->m_group)
+        pWindow->m_group->updateWorkspace(pWorkspace);
 
-    g_layoutManager->newTarget(pWindow->layoutTarget(), pWorkspace->space());
+    g_layoutManager->newTarget(pWindow->layoutTarget(), pWorkspace->m_space);
 
     if (FULLSCREEN)
         Fullscreen::controller()->setFullscreenMode(pWindow, FULLSCREENMODE, std::nullopt, LAYOUT_AWARE);
@@ -87,8 +84,8 @@ void CGlobalWindowController::moveWindowToWorkspace(PHLWINDOW pWindow, PHLWORKSP
         pWindow->m_workspace->updateWindows();
     updateSuspendedStates();
 
-    if (!WASVISIBLE && pWindow->m_workspace && pWindow->m_workspace->visible()) {
-        pWindow->presentation().alpha(View::WINDOW_ALPHA_MOVE_FROM_WORKSPACE)->setValueAndWarp(0.F);
-        *pWindow->presentation().alpha(View::WINDOW_ALPHA_MOVE_FROM_WORKSPACE) = 1.F;
+    if (!WASVISIBLE && pWindow->m_workspace && pWindow->m_workspace->isVisible()) {
+        pWindow->alpha(View::WINDOW_ALPHA_MOVE_FROM_WORKSPACE)->setValueAndWarp(0.F);
+        *pWindow->alpha(View::WINDOW_ALPHA_MOVE_FROM_WORKSPACE) = 1.F;
     }
 }

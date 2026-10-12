@@ -5,6 +5,8 @@
 precision     highp float;
 in vec2       v_texcoord;
 
+uniform int   sourceTF; // eTransferFunction
+uniform int   targetTF; // eTransferFunction
 uniform mat3  targetPrimariesXYZ;
 
 uniform vec2  fullSizeUntransformed;
@@ -26,10 +28,6 @@ uniform float roundingPower;
 uniform vec2  topLeft;
 uniform vec2  fullSize;
 #include "defines.h"
-
-const int sourceTF = SOURCE_TF;
-const int targetTF = TARGET_TF;
-
 #include "rounding.glsl"
 #include "CM.glsl"
 #include "border.glsl"

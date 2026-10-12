@@ -1,15 +1,11 @@
 #include "MotionBlurTransformer.hpp"
 
 #include "../../config/ConfigValue.hpp"
-#include "../../desktop/view/window/Window.hpp"
-#include "../../desktop/view/window/WindowEffectsController.hpp"
-#include "../../desktop/view/window/WindowPresentation.hpp"
+#include "../../desktop/view/Window.hpp"
 #include "../../managers/eventLoop/EventLoopManager.hpp"
 #include "../../managers/eventLoop/EventLoopTimer.hpp"
 #include "../../managers/fullscreen/FullscreenController.hpp"
-#include "../../workspace/presentation/WorkspacePresentable.hpp"
 #include "../Renderer.hpp"
-#include "../WindowRenderPresentation.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -34,55 +30,19 @@ bool CMotionBlurTransformer::shouldEnable(PHLWINDOW window) {
     return *PMBENABLED && *PMBSAMPLES > 1 && !Fullscreen::controller()->isFullscreen(window);
 }
 
-SWindowTransformBuffer CMotionBlurTransformer::transform(CRenderContext& ctx, const SWindowTransformBuffer& in, const SWindowTransformContext&) {
+SP<Render::IFramebuffer> CMotionBlurTransformer::transform(SP<Render::IFramebuffer> in) {
     return in;
 }
 
-int CMotionBlurTransformer::priority() const {
-    return 100;
-}
-
-bool CMotionBlurTransformer::active() const {
-    return state(true).has_value();
-}
-
-bool CMotionBlurTransformer::allocatesOutputBuffer() const {
-    return false;
-}
-
-CBox CMotionBlurTransformer::sourceBoxForOutput(const CBox& outputBox, const CBox& inputBox) const {
-    return outputBox.intersection(inputBox);
-}
-
-CBox CMotionBlurTransformer::transformBoxForDamage(const CBox& currentBox) const {
-    const auto STATE = state(true);
-    if (!STATE)
-        return currentBox;
-
-    const Vector2D relPos = currentBox.pos() - STATE->current.pos();
-    const Vector2D scale  = STATE->previous.size() / STATE->current.size();
-
-    CBox           previous = {STATE->previous.pos() + relPos * scale, currentBox.size() * scale};
-    CBox           damaged  = MotionBlur::extents(previous, currentBox);
-    damaged.expand(4.F);
-
-    return damaged;
-}
-
-void CMotionBlurTransformer::amendTransformedRenderData(CRenderContext& ctx, const CBox& currentBox, SMotionBlurData* pMotionBlurData,
-                                                        const Render::SWindowRenderPresentation& presentation) {
+void CMotionBlurTransformer::amendTransformedRenderData(const CBox& currentBox, SMotionBlurData* pMotionBlurData) {
     if (!pMotionBlurData)
         return;
 
-    const auto PMONITOR = ctx.m_data.pMonitor;
+    const auto PMONITOR = g_pHyprRenderer->m_renderData.pMonitor;
     if (!PMONITOR)
         return;
 
-    const auto PWINDOW = m_window.lock();
-    if (!shouldEnable(PWINDOW))
-        return;
-
-    const auto STATE = stateForOffset(presentation.workspaceOffset + presentation.floatingOffset, false);
+    const auto STATE = state();
     if (!STATE)
         return;
 
@@ -116,14 +76,10 @@ std::optional<MotionBlur::SState> CMotionBlurTransformer::state(bool allowStale)
     if (!shouldEnable(PWINDOW))
         return std::nullopt;
 
-    const Vector2D RENDEROFFSET = ((PWINDOW->m_state & Desktop::View::WINDOW_STATE_PINNED) || !PWINDOW->m_workspace ? Vector2D{} : PWINDOW->m_workspace->m_renderOffset->value()) +
-        PWINDOW->presentation().floatingOffset();
-    return stateForOffset(RENDEROFFSET, allowStale);
-}
+    static auto    PMBSAMPLES = CConfigValue<Config::INTEGER>("decoration:motion_blur:samples");
 
-std::optional<MotionBlur::SState> CMotionBlurTransformer::stateForOffset(const Vector2D& renderOffset, bool allowStale) const {
-    static auto PMBSAMPLES = CConfigValue<Config::INTEGER>("decoration:motion_blur:samples");
-    return m_motionBlur.state(std::clamp(sc<int>(*PMBSAMPLES), 2, 64), renderOffset, allowStale);
+    const Vector2D RENDEROFFSET = (PWINDOW->m_pinned || !PWINDOW->m_workspace ? Vector2D{} : PWINDOW->m_workspace->m_renderOffset->value()) + PWINDOW->m_floatingOffset;
+    return m_motionBlur.state(std::clamp(sc<int>(*PMBSAMPLES), 2, 64), RENDEROFFSET, allowStale);
 }
 
 void CMotionBlurTransformer::armExpiryTimer() {
@@ -132,7 +88,7 @@ void CMotionBlurTransformer::armExpiryTimer() {
             std::nullopt,
             [window = m_window](SP<CEventLoopTimer>, void*) {
                 if (const auto PWINDOW = window.lock())
-                    PWINDOW->effects().resetMotionBlur();
+                    PWINDOW->resetMotionBlur();
             },
             nullptr);
         g_pEventLoopManager->addTimer(m_expiryTimer);

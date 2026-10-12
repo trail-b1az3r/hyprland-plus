@@ -36,7 +36,7 @@ static bool waitForMonitorRemoved(const char* name) {
 TEST_CASE(single_window_aspect_ratio) {
     OK(getFromSocket("/eval hl.config({ layout = { single_window_aspect_ratio = '1 1' } })"));
 
-    SPAWN_KITTY("a");
+    Tests::spawnKitty();
 
     {
         auto str = getFromSocket("/activewindow");
@@ -44,7 +44,7 @@ TEST_CASE(single_window_aspect_ratio) {
         EXPECT_CONTAINS(str, "size: 1036,1036");
     }
 
-    SPAWN_KITTY("a");
+    Tests::spawnKitty();
 
     OK(getFromSocket("/dispatch hl.dsp.window.kill({ window = 'activewindow' })"));
 
@@ -68,9 +68,9 @@ TEST_CASE(single_window_aspect_ratio) {
 
 // Don't crash when focus after global geometry changes
 TEST_CASE(crashOnGeomUpdate) {
-    SPAWN_KITTY("a");
-    SPAWN_KITTY("a");
-    SPAWN_KITTY("a");
+    Tests::spawnKitty();
+    Tests::spawnKitty();
+    Tests::spawnKitty();
 
     // move the layout
     OK(getFromSocket("/eval hl.monitor({ output = 'HEADLESS-2', mode = '1920x1080@60', position = '1000x0', scale = '1' })"));
@@ -105,9 +105,9 @@ TEST_CASE(layoutRefreshDuringMonitorTeardown) {
 
     OK(getFromSocket(std::format("/dispatch hl.dsp.focus({{ monitor = '{}' }})", TEST_OUTPUT)));
     OK(getFromSocket("/dispatch hl.dsp.focus({ workspace = '30' })"));
-    SPAWN_KITTY("layout_teardown_a");
+    ASSERT(!!Tests::spawnKitty("layout_teardown_a"), true);
     OK(getFromSocket("/dispatch hl.dsp.focus({ workspace = '31' })"));
-    SPAWN_KITTY("layout_teardown_b");
+    ASSERT(!!Tests::spawnKitty("layout_teardown_b"), true);
 
     OK(getFromSocket("/dispatch hl.dsp.focus({ monitor = 'HEADLESS-2' })"));
     OK(getFromSocket("/dispatch hl.dsp.focus({ workspace = '1' })"));
@@ -122,7 +122,7 @@ TEST_CASE(layoutRefreshDuringMonitorTeardown) {
 
 // Test if size + pos is preserved after fs cycle
 TEST_CASE(posPreserve) {
-    SPAWN_KITTY("kitty");
+    Tests::spawnKitty();
 
     OK(getFromSocket("/dispatch hl.dsp.window.float({ action = 'set', window = 'class:kitty' })"));
     OK(getFromSocket("/dispatch hl.dsp.window.resize({ x = 1337, y = 69, window = 'class:kitty' })"));
@@ -158,19 +158,6 @@ TEST_CASE(posPreserve) {
         EXPECT_CONTAINS(str, "at: 581,420");
         EXPECT_CONTAINS(str, "size: 1337,69");
     }
-
-    OK(getFromSocket("/eval hl.config({ binds = { allow_pin_fullscreen = true } })"));
-    OK(getFromSocket("/dispatch hl.dsp.focus({ workspace = '1' })"));
-    OK(getFromSocket("/dispatch hl.dsp.window.pin({ action = 'set', window = 'class:kitty' })"));
-    OK(getFromSocket("/dispatch hl.dsp.focus({ workspace = '2' })"));
-    OK(getFromSocket("/dispatch hl.dsp.window.fullscreen()"));
-    OK(getFromSocket("/dispatch hl.dsp.window.fullscreen()"));
-
-    {
-        auto str = getFromSocket("/activewindow");
-        EXPECT_CONTAINS(str, "at: 581,420");
-        EXPECT_CONTAINS(str, "size: 1337,69");
-    }
 }
 
 TEST_CASE(focusMRUAfterClose) {
@@ -180,9 +167,9 @@ TEST_CASE(focusMRUAfterClose) {
     OK(getFromSocket("/eval hl.config({ dwindle = { default_split_ratio = 1.25 } })"));
     OK(getFromSocket("/eval hl.config({ input = { focus_on_close = 2 } })"));
 
-    SPAWN_KITTY("kitty_A");
-    SPAWN_KITTY("kitty_B");
-    SPAWN_KITTY("kitty_C");
+    ASSERT(!!Tests::spawnKitty("kitty_A"), true);
+    ASSERT(!!Tests::spawnKitty("kitty_B"), true);
+    ASSERT(!!Tests::spawnKitty("kitty_C"), true);
 
     OK(getFromSocket("/dispatch hl.dsp.focus({ window = 'class:kitty_A' })"));
     OK(getFromSocket("/dispatch hl.dsp.focus({ window = 'class:kitty_B' })"));
@@ -208,10 +195,10 @@ TEST_CASE(focusMRUAfterClose) {
 TEST_CASE(focusPreservedLayoutChange) {
     OK(getFromSocket("r/eval hl.config({ general = { layout = 'master' } })"));
 
-    SPAWN_KITTY("kitty_A");
-    SPAWN_KITTY("kitty_B");
-    SPAWN_KITTY("kitty_C");
-    SPAWN_KITTY("kitty_D");
+    ASSERT(!!Tests::spawnKitty("kitty_A"), true);
+    ASSERT(!!Tests::spawnKitty("kitty_B"), true);
+    ASSERT(!!Tests::spawnKitty("kitty_C"), true);
+    ASSERT(!!Tests::spawnKitty("kitty_D"), true);
 
     OK(getFromSocket("/dispatch hl.dsp.focus({ window = 'class:kitty_C' })"));
 

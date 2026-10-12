@@ -64,7 +64,7 @@ void CShaderLoader::include(const std::string& filename) {
     m_includes.insert({filename, loadShader(filename)});
 }
 
-std::string CShaderLoader::getDefines(const SShaderVariant& variant) {
+std::string CShaderLoader::getDefines(ShaderFeatureFlags features) {
     static constexpr auto defines = std::to_array<std::pair<std::string_view, ePreparedFragmentShaderFeature>>({
         {"USE_RGBA", SH_FEAT_RGBA},
         {"USE_DISCARD", SH_FEAT_DISCARD},
@@ -83,14 +83,10 @@ std::string CShaderLoader::getDefines(const SShaderVariant& variant) {
     });
 
     std::string           res;
-    res.reserve(351);
+    res.reserve(309);
     for (const auto& [name, flag] : defines) {
-        std::format_to(std::back_inserter(res), "#define {} {}\n", name, (variant.features & flag) != 0 ? '1' : '0');
+        std::format_to(std::back_inserter(res), "#define {} {}\n", name, (features & flag) != 0 ? '1' : '0');
     }
-
-    // eTransferFunction values, the shaders compare them against the CM_TRANSFER_FUNCTION_* in CM.glsl
-    std::format_to(std::back_inserter(res), "#define SOURCE_TF {}\n", sc<int>(variant.sourceTF));
-    std::format_to(std::back_inserter(res), "#define TARGET_TF {}\n", sc<int>(variant.targetTF));
     return res;
 }
 
@@ -114,10 +110,10 @@ std::string CShaderLoader::processSource(const std::string& source, glslang_stag
     glslang_shader_t* shader = glslang_shader_create(&input);
 
     if (!glslang_shader_preprocess(shader, &input)) {
-        LOG(Log::ERR, "GLSL preprocessing failed");
-        LOG(Log::ERR, "{}", glslang_shader_get_info_log(shader));
-        LOG(Log::ERR, "{}", glslang_shader_get_info_debug_log(shader));
-        LOG(Log::ERR, "{}", input.code);
+        Log::logger->log(Log::ERR, "GLSL preprocessing failed");
+        Log::logger->log(Log::ERR, "{}", glslang_shader_get_info_log(shader));
+        Log::logger->log(Log::ERR, "{}", glslang_shader_get_info_debug_log(shader));
+        Log::logger->log(Log::ERR, "{}", input.code);
         glslang_shader_delete(shader);
         return source;
     }
@@ -128,7 +124,7 @@ std::string CShaderLoader::processSource(const std::string& source, glslang_stag
 
     while (std::getline(stream, line)) {
         if (!line.starts_with("#line "))
-            code += std::format("{}\n", line);
+            code += line + "\n";
     }
 
     glslang_shader_delete(shader);
@@ -150,26 +146,19 @@ std::string CShaderLoader::process(const std::string& filename, const std::map<s
     return res;
 }
 
-std::string CShaderLoader::getVariantSource(ePreparedFragmentShader frag, SShaderVariant variant) {
+std::string CShaderLoader::getVariantSource(ePreparedFragmentShader frag, ShaderFeatureFlags features) {
     static const auto PCM = CConfigValue<Config::INTEGER>("render:cm_enabled");
     if (!*PCM)
-        variant.features &= ~(SH_FEAT_CM | SH_FEAT_TONEMAP | SH_FEAT_ALT_TONEMAP | SH_FEAT_SDR_MOD);
+        features &= ~(SH_FEAT_CM | SH_FEAT_TONEMAP | SH_FEAT_ALT_TONEMAP | SH_FEAT_SDR_MOD);
 
-    // without CM the transfer functions are unused, keep them at the default so we don't cache
-    // several variants of identical source
-    if (!(variant.features & SH_FEAT_CM)) {
-        variant.sourceTF = SHADER_DEFAULT_TF;
-        variant.targetTF = SHADER_DEFAULT_TF;
-    }
-
-    if (!m_fragVariants[frag].contains(variant)) {
+    if (!m_fragVariants[frag].contains(features)) {
         ASSERT(m_fragFiles[frag].length());
-        m_overrideDefines             = getDefines(variant);
-        m_fragVariants[frag][variant] = processSource(m_fragFiles[frag]);
-        m_overrideDefines             = "";
+        m_overrideDefines              = getDefines(features);
+        m_fragVariants[frag][features] = processSource(m_fragFiles[frag]);
+        m_overrideDefines              = "";
     }
 
-    return m_fragVariants[frag][variant];
+    return m_fragVariants[frag][features];
 }
 
 const std::map<std::string, std::string>& CShaderLoader::includes() {
@@ -186,12 +175,12 @@ std::string CShaderLoader::loadShader(const std::string& filename) {
     }
     const auto home = Hyprutils::Path::getHome();
     if (home.has_value()) {
-        const auto src = NFsUtils::readFileAsString(std::format("{}/hypr/shaders/{}", home.value(), filename));
+        const auto src = NFsUtils::readFileAsString(home.value() + "/hypr/shaders/" + filename);
         if (src.has_value())
             return src.value();
     }
     for (auto& e : ASSET_PATHS) {
-        const auto src = NFsUtils::readFileAsString(std::format("{}/hypr/shaders/{}", e, filename));
+        const auto src = NFsUtils::readFileAsString(std::string{e} + "/hypr/shaders/" + filename);
         if (src.has_value())
             return src.value();
     }

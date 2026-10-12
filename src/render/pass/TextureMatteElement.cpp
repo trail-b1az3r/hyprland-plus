@@ -4,10 +4,10 @@ CTextureMatteElement::CTextureMatteElement(const CTextureMatteElement::STextureM
     ;
 }
 
-bool CTextureMatteElement::needsLiveBlur(Render::CRenderContext& ctx) {
+bool CTextureMatteElement::needsLiveBlur() {
     return false;
 }
 
-bool CTextureMatteElement::needsPrecomputeBlur(Render::CRenderContext& ctx) {
+bool CTextureMatteElement::needsPrecomputeBlur() {
     return false;
 }

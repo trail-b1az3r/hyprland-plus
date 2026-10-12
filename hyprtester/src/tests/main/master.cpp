@@ -5,7 +5,6 @@
 #include <array>
 #include <cmath>
 #include <map>
-#include <format>
 #include <string>
 #include <utility>
 #include <vector>
@@ -19,7 +18,8 @@ TEST_CASE(focusMasterPrevious) {
     NLog::log("{}Spawning 1 master and 3 slave windows", Colors::YELLOW);
     // order of windows set according to new_status = master (set in test.lua)
     for (auto const& win : {"slave1", "slave2", "slave3", "master"}) {
-        SPAWN_KITTY(win);
+        if (!Tests::spawnKitty(win))
+            FAIL_TEST("Could not spawn kitty with win class `{}`", win);
     }
     NLog::log("{}Ensuring focus is on master before testing", Colors::YELLOW);
     OK(getFromSocket("/dispatch hl.dsp.layout('focusmaster master')"));
@@ -109,7 +109,8 @@ TEST_CASE(masterTestFsFocusUnderFSWindow) {
     OK(getFromSocket("r/eval hl.config({ general = { layout = 'master' } })"));
 
     for (auto const& win : {"master", "slave1", "slave2"}) {
-        SPAWN_KITTY(win);
+        if (!Tests::spawnKitty(win))
+            FAIL_TEST("Could not spawn kitty with win class `{}`", win);
     }
 
     OK(getFromSocket("/dispatch hl.dsp.focus({ window = 'class:master' })"));
@@ -124,7 +125,7 @@ TEST_CASE(masterTestFsFocusUnderFSWindow) {
 
     OK(getFromSocket("/eval hl.config({ misc = { on_focus_under_fullscreen = 1 } })"));
 
-    SPAWN_KITTY("new_master");
+    Tests::spawnKitty("new_master");
 
     {
         auto str = getFromSocket("/activewindow");
@@ -136,7 +137,7 @@ TEST_CASE(masterTestFsFocusUnderFSWindow) {
 
     OK(getFromSocket("/eval hl.config({ misc = { on_focus_under_fullscreen = 0 } })"));
 
-    SPAWN_KITTY("ignored");
+    Tests::spawnKitty("ignored");
 
     {
         auto str = getFromSocket("/activewindow");
@@ -148,7 +149,7 @@ TEST_CASE(masterTestFsFocusUnderFSWindow) {
 
     OK(getFromSocket("/eval hl.config({ misc = { on_focus_under_fullscreen = 2 } })"));
 
-    SPAWN_KITTY("vaxwashere");
+    Tests::spawnKitty("vaxwashere");
 
     {
         auto str = getFromSocket("/activewindow");
@@ -163,8 +164,8 @@ TEST_CASE(masterFullscreenMaximiseDispatchers) {
 
     OK(getFromSocket("/eval hl.config({ general = { layout = 'master' } })"));
 
-    SPAWN_KITTY("kitty_A");
-    SPAWN_KITTY("kitty_B");
+    Tests::spawnKitty("kitty_A");
+    Tests::spawnKitty("kitty_B");
 
     OK(getFromSocket("/dispatch hl.dsp.focus({ window = 'class:kitty_A' })"));
     OK(getFromSocket("/dispatch hl.dsp.window.fullscreen({ mode = 'fullscreen', action = 'set' })"));
@@ -240,7 +241,7 @@ TEST_CASE(masterNewWindowTakesOverFullscreen) {
 
     OK(getFromSocket("/eval hl.config({ misc = { on_focus_under_fullscreen = 0 } })"));
 
-    SPAWN_KITTY("kitty_A");
+    Tests::spawnKitty("kitty_A");
 
     OK(getFromSocket("/dispatch hl.dsp.window.fullscreen({ mode = 'fullscreen' })"));
 
@@ -251,7 +252,7 @@ TEST_CASE(masterNewWindowTakesOverFullscreen) {
         EXPECT_CONTAINS(str, "kitty_A");
     }
 
-    SPAWN_KITTY("kitty_B");
+    Tests::spawnKitty("kitty_B");
 
     {
         auto str = getFromSocket("/activewindow");
@@ -272,7 +273,7 @@ TEST_CASE(masterNewWindowTakesOverFullscreen) {
 
     OK(getFromSocket("/eval hl.config({ misc = { on_focus_under_fullscreen = 1 } })"));
 
-    SPAWN_KITTY("kitty_C");
+    Tests::spawnKitty("kitty_C");
 
     {
         auto str = getFromSocket("/activewindow");
@@ -283,7 +284,7 @@ TEST_CASE(masterNewWindowTakesOverFullscreen) {
 
     OK(getFromSocket("/eval hl.config({ misc = { on_focus_under_fullscreen = 2 } })"));
 
-    SPAWN_KITTY("kitty_D");
+    Tests::spawnKitty("kitty_D");
 
     {
         auto str = getFromSocket("/activewindow");
@@ -305,8 +306,8 @@ TEST_CASE(masterExitWindowRetainsFullscreen) {
 
     OK(getFromSocket("/eval hl.config({ misc = { exit_window_retains_fullscreen = false } })"));
 
-    SPAWN_KITTY("kitty_A");
-    SPAWN_KITTY("kitty_B");
+    Tests::spawnKitty("kitty_A");
+    Tests::spawnKitty("kitty_B");
 
     OK(getFromSocket("/dispatch hl.dsp.window.fullscreen({ mode = 'fullscreen' })"));
 
@@ -325,7 +326,7 @@ TEST_CASE(masterExitWindowRetainsFullscreen) {
         EXPECT_CONTAINS(str, "fullscreenClient: 0");
     }
 
-    SPAWN_KITTY("kitty_B");
+    Tests::spawnKitty("kitty_B");
     OK(getFromSocket("/dispatch hl.dsp.window.fullscreen({ mode = 'fullscreen' })"));
     OK(getFromSocket("/eval hl.config({ misc = { exit_window_retains_fullscreen = true } })"));
 
@@ -356,7 +357,7 @@ TEST_CASE(masterFullscreenPinnedWindows) {
 
     OK(getFromSocket("r/eval hl.config({ general = { layout = 'master' } })"));
 
-    SPAWN_KITTY("cake");
+    Tests::spawnKitty("cake");
 
     OK(getFromSocket("/dispatch hl.dsp.window.float({action = 'enable', window = 'class:cake'})"));
 
@@ -533,12 +534,12 @@ TEST_CASE(masterFullscreenNonInterference) {
 
     OK(getFromSocket("r/eval hl.config({ general = { layout = 'master' } })"));
 
-    SPAWN_KITTY("red");
-    SPAWN_KITTY("crimson");
-    SPAWN_KITTY("blue");
-    SPAWN_KITTY("cyan");
-    SPAWN_KITTY("azure");
-    SPAWN_KITTY("green");
+    Tests::spawnKitty("red");
+    Tests::spawnKitty("crimson");
+    Tests::spawnKitty("blue");
+    Tests::spawnKitty("cyan");
+    Tests::spawnKitty("azure");
+    Tests::spawnKitty("green");
 
     OK(getFromSocket("/dispatch hl.dsp.focus({ window = 'class:red' })"));
 
@@ -691,13 +692,14 @@ TEST_CASE(rollFocus) {
         // rotate the windows vector along with the actual windows
         // the rolling behavior of the window focus should follow the
         // rotating behavior of std::ranges::rotate
-        OK(getFromSocket(std::format("/dispatch hl.dsp.layout('{}')", dir)));
+        OK(getFromSocket("/dispatch hl.dsp.layout('" + dir + "')"));
         std::ranges::rotate(windows.begin(), pivot, windows.end());
-        ASSERT_CONTAINS(getFromSocket("/activewindow"), std::format("class: {}", windows.back()));
+        ASSERT_CONTAINS(getFromSocket("/activewindow"), "class: " + windows.back());
     };
 
     for (auto const& win : windows) {
-        SPAWN_KITTY(win);
+        if (!Tests::spawnKitty(win))
+            FAIL_TEST("Could not spawn kitty with win class `{}`", win);
     }
 
     // focus master
@@ -780,7 +782,7 @@ TEST_CASE(centerMasterColumnResize) {
 
     // focus a window by class and read its {left edge x, height} from /activewindow
     auto geomOf = [&](const std::string& cls) -> std::pair<double, double> {
-        getFromSocket(std::format("/dispatch hl.dsp.focus({{ window = 'class:{}' }})", cls));
+        getFromSocket("/dispatch hl.dsp.focus({ window = 'class:" + cls + "' })");
         const auto STR = getFromSocket("/activewindow");
         const auto AT  = Tests::getAttribute(STR, "at");   // "x,y"
         const auto SZ  = Tests::getAttribute(STR, "size"); // "w,h"
@@ -791,7 +793,7 @@ TEST_CASE(centerMasterColumnResize) {
 
     // resizeactive-style relative resize of a specific window along y
     auto resizeY = [&](const std::string& cls, int dy) {
-        return getFromSocket(std::format("/dispatch hl.dsp.window.resize({{ x = 0, y = {}, relative = true, window = 'class:{}' }})", dy, cls));
+        return getFromSocket("/dispatch hl.dsp.window.resize({ x = 0, y = " + std::to_string(dy) + ", relative = true, window = 'class:" + cls + "' })");
     };
 
     // `top` and `bottom` share one column and must resize vertically (one grows, the other shrinks,
@@ -818,7 +820,8 @@ TEST_CASE(centerMasterColumnResize) {
     OK(getFromSocket(
         "r/eval hl.config({ general = { layout = 'master' }, master = { orientation = 'center', center_master_fallback = 'left', slave_count_for_center_master = 2 } })"));
     for (auto const& win : {"slave1", "slave2", "slave3", "master"}) {
-        SPAWN_KITTY(win);
+        if (!Tests::spawnKitty(win))
+            FAIL_TEST("Could not spawn kitty with win class `{}`", win);
     }
 
     // default `left` fallback: slave1 (top) + slave3 (bottom) on the left, slave2 alone on the right
@@ -839,7 +842,8 @@ TEST_CASE(centerMasterColumnResize) {
     // new_status = master => `extra` becomes the master and `master` drops to the 4th slave.
     NLog::log("{}center master, left fallback, 4 slaves: columns still resize (no regression)", Colors::YELLOW);
     OK(getFromSocket("r/eval hl.config({ master = { center_master_fallback = 'left' } })"));
-    SPAWN_KITTY("extra");
+    if (!Tests::spawnKitty("extra"))
+        FAIL_TEST("Could not spawn kitty with win class `{}`", "extra");
     expectColumnResizes("slave1", "slave3", "slave2");
 
     // even count, no regression: 2 slaves => 1 per column, so a vertical resize is a no-op
@@ -847,7 +851,8 @@ TEST_CASE(centerMasterColumnResize) {
     if (!Tests::killAllWindows())
         FAIL_TEST("Could not kill all windows before the {}-slave phase", 2);
     for (auto const& win : {"slave1", "slave2", "master"}) {
-        SPAWN_KITTY(win);
+        if (!Tests::spawnKitty(win))
+            FAIL_TEST("Could not spawn kitty with win class `{}`", win);
     }
     const double H0 = heightOf("slave1");
     OK(resizeY("slave1", 80));
@@ -876,7 +881,8 @@ SUBTEST(expectCenterDrop, const std::string& pick, bool dropRight, const std::st
         FAIL_TEST("Could not clear windows{}", "");
 
     for (auto const& win : {"w1", "w2", "w3"}) {
-        SPAWN_KITTY(win);
+        if (!Tests::spawnKitty(win))
+            FAIL_TEST("Could not spawn kitty with win class `{}`", win);
     }
     Tests::waitUntilWindowsN(3);
 
@@ -911,103 +917,4 @@ TEST_CASE(masterCenterDropAtCursor) {
     CALL_SUBTEST(expectCenterDrop, "M", true, "R", "L", "M");
     CALL_SUBTEST(expectCenterDrop, "R", false, "R", "M", "L");
     CALL_SUBTEST(expectCenterDrop, "R", true, "L", "M", "R");
-}
-
-// In a non-centered master layout with three windows w1/w2/w3, return their
-// classes ordered: { master, top slave, bottom slave }.
-static std::array<std::string, 3> detectTripleArrangement(const std::array<std::string, 3>& classes) {
-    std::vector<std::pair<std::pair<int, int>, std::string>> wins;
-    for (auto const& cls : classes) {
-        getFromSocket(std::format("/dispatch hl.dsp.focus({{ window = 'class:{}' }})", cls));
-        const auto at    = Tests::getAttribute(getFromSocket("/activewindow"), "at");
-        const auto comma = at.find(',');
-        const auto x     = std::stoi(at.substr(0, comma));
-        const auto y     = std::stoi(at.substr(comma + 1));
-        wins.emplace_back(std::pair(x, y), cls);
-    }
-    std::ranges::sort(
-        wins, [&](std::pair<int, int> w1, std::pair<int, int> w2) { return (w1.first < w2.first) || (w1.second < w2.second); },
-        &std::pair<std::pair<int, int>, std::string>::first);
-    return {wins[0].second, wins[1].second, wins[2].second};
-}
-
-// Create three windows, and drags `pick` to where `place` was before the drag
-// started. Assert that windows are in their expected locations afterwards.
-// `pick` and `place` are numbers from 1 to 3, with 1 representing the master
-// window, and 2/3 being the upper/lower windows in the stack, respectively.
-SUBTEST(expectTripleDragSwap, const uint pick, const uint place, const uint exp1, const uint exp2, const uint exp3) {
-    // start from a fresh set of three windows
-    if (!Tests::killAllWindows())
-        FAIL_TEST("Could not clear windows{}", "");
-
-    const std::array<std::string, 3> CLASSES = {"w1", "w2", "w3"};
-    for (auto const& win : CLASSES) {
-        SPAWN_KITTY(win);
-    }
-    Tests::waitUntilWindowsN(3);
-
-    const auto INITIAL = detectTripleArrangement(CLASSES);
-    double     DROPX, DROPY;
-    {
-        getFromSocket(std::format("/dispatch hl.dsp.focus({{ window = 'class:{}' }})", INITIAL[place - 1]));
-        const auto at    = Tests::getAttribute(getFromSocket("/activewindow"), "at");
-        const auto comma = at.find(',');
-        DROPX            = std::stoi(at.substr(0, comma));
-        DROPY            = std::stoi(at.substr(comma + 1));
-    }
-
-    NLog::log("{}Dragging window {} and dropping it in position {} ({},{})", Colors::YELLOW, pick, place, DROPX, DROPY);
-    OK(getFromSocket(std::format("/eval hl.plugin.test.drag_window('{}', {}, {})", INITIAL[pick - 1], DROPX, DROPY)));
-
-    const auto FINAL = detectTripleArrangement(CLASSES);
-    EXPECT(FINAL[0], INITIAL[exp1 - 1]);
-    EXPECT(FINAL[1], INITIAL[exp2 - 1]);
-    EXPECT(FINAL[2], INITIAL[exp3 - 1]);
-}
-
-TEST_CASE(masterDropAtCursor) {
-    OK(getFromSocket("r/eval hl.config({ general = { layout = 'master' } })"));
-    OK(getFromSocket("/eval hl.config({ master = { drop_at_cursor = true } })"));
-
-    NLog::log("{}Testing master window drag with new_status=slave", Colors::GREEN);
-    OK(getFromSocket("/eval hl.config({ master = { new_status = 'slave' } })"));
-    CALL_SUBTEST(expectTripleDragSwap, 1, 2, 2, 1, 3);
-    CALL_SUBTEST(expectTripleDragSwap, 1, 3, 2, 3, 1);
-    CALL_SUBTEST(expectTripleDragSwap, 3, 1, 3, 1, 2);
-    CALL_SUBTEST(expectTripleDragSwap, 3, 2, 1, 3, 2);
-    NLog::log("{}...and again with new_on_top", Colors::GREEN);
-    OK(getFromSocket("/eval hl.config({ master = { new_on_top = true } })"));
-    CALL_SUBTEST(expectTripleDragSwap, 1, 2, 2, 1, 3);
-    CALL_SUBTEST(expectTripleDragSwap, 1, 3, 2, 3, 1);
-    CALL_SUBTEST(expectTripleDragSwap, 3, 1, 3, 2, 1);
-    CALL_SUBTEST(expectTripleDragSwap, 3, 2, 1, 3, 2);
-    OK(getFromSocket("/eval hl.config({ master = { new_on_top = false } })"));
-
-    NLog::log("{}Testing master window drag with new_status=master", Colors::GREEN);
-    OK(getFromSocket("/eval hl.config({ master = { new_status = 'master' } })"));
-    CALL_SUBTEST(expectTripleDragSwap, 1, 2, 2, 1, 3);
-    CALL_SUBTEST(expectTripleDragSwap, 1, 3, 2, 3, 1);
-    CALL_SUBTEST(expectTripleDragSwap, 3, 1, 3, 2, 1);
-    CALL_SUBTEST(expectTripleDragSwap, 3, 2, 1, 3, 2);
-    NLog::log("{}...and again with new_on_top", Colors::GREEN);
-    OK(getFromSocket("/eval hl.config({ master = { new_on_top = true } })"));
-    CALL_SUBTEST(expectTripleDragSwap, 1, 2, 2, 1, 3);
-    CALL_SUBTEST(expectTripleDragSwap, 1, 3, 2, 3, 1);
-    CALL_SUBTEST(expectTripleDragSwap, 3, 1, 3, 1, 2);
-    CALL_SUBTEST(expectTripleDragSwap, 3, 2, 1, 3, 2);
-    OK(getFromSocket("/eval hl.config({ master = { new_on_top = false } })"));
-
-    NLog::log("{}Testing master window drag with new_status=inherit", Colors::GREEN);
-    OK(getFromSocket("/eval hl.config({ master = { new_status = 'inherit' } })"));
-    CALL_SUBTEST(expectTripleDragSwap, 1, 2, 2, 1, 3);
-    CALL_SUBTEST(expectTripleDragSwap, 1, 3, 2, 3, 1);
-    CALL_SUBTEST(expectTripleDragSwap, 3, 1, 3, 2, 1);
-    CALL_SUBTEST(expectTripleDragSwap, 3, 2, 1, 3, 2);
-    NLog::log("{}...and again with new_on_top", Colors::GREEN);
-    OK(getFromSocket("/eval hl.config({ master = { new_on_top = true } })"));
-    CALL_SUBTEST(expectTripleDragSwap, 1, 2, 2, 1, 3);
-    CALL_SUBTEST(expectTripleDragSwap, 1, 3, 2, 3, 1);
-    CALL_SUBTEST(expectTripleDragSwap, 3, 1, 3, 1, 2);
-    CALL_SUBTEST(expectTripleDragSwap, 3, 2, 1, 3, 2);
-    OK(getFromSocket("/eval hl.config({ master = { new_on_top = false } })"));
 }

@@ -5,10 +5,6 @@
 
 #include "../desktop/DesktopTypes.hpp"
 
-namespace Render {
-    class CRenderContext;
-}
-
 namespace Notification {
 
     class CNotificationOverlay {
@@ -16,7 +12,7 @@ namespace Notification {
         CNotificationOverlay();
         ~CNotificationOverlay();
 
-        void              draw(Render::CRenderContext& ctx, PHLMONITOR pMonitor);
+        void              draw(PHLMONITOR pMonitor);
         SP<CNotification> addNotification(const std::string& text, const CHyprColor& color, const float timeMs, const eIcons icon = ICON_NONE, const float fontSize = 13.f);
         void              dismissNotifications(const int amount);
         void              dismissNotification(const SP<CNotification>& notification);
@@ -29,7 +25,7 @@ namespace Notification {
         void                           ensureNotificationCache(CNotification& notif, PHLMONITOR pMonitor, const std::string& fontFamily);
         eIconBackend                   iconBackendForFont(const std::string& fontFamily);
         CBox                           notificationDamageForMonitor(PHLMONITOR pMonitor);
-        CBox                           drawNotifications(Render::CRenderContext& ctx, PHLMONITOR pMonitor);
+        CBox                           drawNotifications(PHLMONITOR pMonitor);
         void                           scheduleFrames() const;
         CBox                           m_lastDamage;
 

@@ -109,21 +109,20 @@ std::string CWorkspaceAlgoMatcher::tiledAlgoForWorkspace(const PHLWORKSPACE& w) 
 }
 
 SP<CAlgorithm> CWorkspaceAlgoMatcher::createAlgorithmForWorkspace(PHLWORKSPACE w) {
-    return CAlgorithm::create(algoForNameTiled(tiledAlgoForWorkspace(w)), makeUnique<Floating::CDefaultFloatingAlgorithm>(), w->space());
+    return CAlgorithm::create(algoForNameTiled(tiledAlgoForWorkspace(w)), makeUnique<Floating::CDefaultFloatingAlgorithm>(), w->m_space);
 }
 
 void CWorkspaceAlgoMatcher::updateWorkspaceLayouts() {
-    const auto WORKSPACES = State::Workspace::state()->workspacesCopy();
+    const auto WORKSPACES = State::workspaceState()->workspacesCopy();
 
     // TODO: make this ID-based, string comparison is slow
     for (const auto& WORKSPACE : WORKSPACES) {
         // Workspaces can briefly outlive usable layout state while monitor
         // changes move or destroy them.
-        if (!WORKSPACE || !WORKSPACE->m_monitor || !WORKSPACE->space())
+        if (!WORKSPACE || WORKSPACE->inert() || !WORKSPACE->m_monitor || !WORKSPACE->m_space)
             continue;
 
-        const auto& SPACE     = WORKSPACE->space();
-        const auto  ALGORITHM = SPACE->algorithm();
+        const auto ALGORITHM = WORKSPACE->m_space->algorithm();
         if (!ALGORITHM)
             continue;
 

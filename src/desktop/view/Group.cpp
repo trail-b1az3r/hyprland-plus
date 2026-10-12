@@ -1,7 +1,5 @@
 #include "Group.hpp"
-#include "window/Window.hpp"
-#include "window/WindowGroupMembership.hpp"
-#include "window/WindowPresentation.hpp"
+#include "Window.hpp"
 
 #include "../../render/decorations/CHyprGroupBarDecoration.hpp"
 #include "../../layout/target/WindowGroupTarget.hpp"
@@ -11,7 +9,7 @@
 #include "../../layout/LayoutManager.hpp"
 #include "../../desktop/state/FocusState.hpp"
 #include "../../Compositor.hpp"
-#include "../../ipc/s2/S2.hpp"
+#include "../../managers/EventManager.hpp"
 #include "../../managers/fullscreen/FullscreenController.hpp"
 
 #include <algorithm>
@@ -48,15 +46,15 @@ void CGroup::init() {
 
     // FIXME: what if some windows are grouped? For now we only do 1-window but YNK
     for (const auto& w : m_windows) {
-        RASSERT(!w->grouping().group(), "CGroup: windows cannot contain grouped in init, this will explode");
-        w->grouping().attach(m_self.lock());
-        m_groupPolicyFlags |= w->grouping().rules();
+        RASSERT(!w->m_group, "CGroup: windows cannot contain grouped in init, this will explode");
+        w->m_group = m_self.lock();
+        m_groupPolicyFlags |= w->m_groupRules;
     }
 
-    g_layoutManager->switchTargets(m_windows.at(0)->windowTarget(), m_target);
+    g_layoutManager->switchTargets(m_windows.at(0)->m_target, m_target);
 
     for (const auto& w : m_windows) {
-        w->windowTarget()->setSpaceGhost(m_target->space());
+        w->m_target->setSpaceGhost(m_target->space());
     }
 
     for (const auto& w : m_windows) {
@@ -65,7 +63,7 @@ void CGroup::init() {
 
     updateWindowVisibility();
 
-    IPC::Socket2::sock()->postEvent({.event = "togglegroup", .data = std::format("1,{:x}", rc<uintptr_t>(m_windows.at(0).get()))});
+    g_pEventManager->postEvent(SHyprIPCEvent({.event = "togglegroup", .data = std::format("1,{:x}", rc<uintptr_t>(m_windows.at(0).get()))}));
 }
 
 void CGroup::destroy() {
@@ -81,7 +79,7 @@ void CGroup::destroy() {
     }
 
     if (POWNER)
-        IPC::Socket2::sock()->postEvent({.event = "togglegroup", .data = std::format("0,{:x}", rc<uintptr_t>(POWNER.get()))});
+        g_pEventManager->postEvent(SHyprIPCEvent({.event = "togglegroup", .data = std::format("0,{:x}", rc<uintptr_t>(POWNER.get()))}));
 }
 
 CGroup::~CGroup() {
@@ -95,21 +93,19 @@ bool CGroup::has(PHLWINDOW w) const {
 }
 
 void CGroup::add(PHLWINDOW w, std::optional<size_t> index) {
-    static auto INSERT_AFTER_CURRENT          = CConfigValue<Config::INTEGER>("group:insert_after_current");
-    static auto PDISABLE                      = CConfigValue<Config::BOOL>("group:groupbar:disable_when_only");
-    const auto  GROUPBAR_DISABLED_ONLY_MEMBER = (*PDISABLE && m_windows.size() == 1) ? m_windows.at(0).lock() : nullptr;
+    static auto INSERT_AFTER_CURRENT = CConfigValue<Config::INTEGER>("group:insert_after_current");
 
-    if (w->grouping().group()) {
-        if (w->grouping().group() == m_self)
+    if (w->m_group) {
+        if (w->m_group == m_self)
             return;
 
-        const auto WINDOWS = w->grouping().group()->windows();
+        const auto WINDOWS = w->m_group->windows();
         for (size_t i = 0; i < WINDOWS.size(); ++i) {
             const auto WINDOW = WINDOWS.at(i).lock();
             if (!WINDOW)
                 continue;
 
-            WINDOW->grouping().group()->remove(WINDOW);
+            WINDOW->m_group->remove(WINDOW);
             add(WINDOW, index ? std::optional(*index + i) : std::nullopt);
         }
 
@@ -131,10 +127,10 @@ void CGroup::add(PHLWINDOW w, std::optional<size_t> index) {
         g_layoutManager->removeTarget(w->layoutTarget());
     }
 
-    w->grouping().attach(m_self.lock());
-    m_groupPolicyFlags |= w->grouping().rules();
-    w->windowTarget()->setSpaceGhost(m_target->space());
-    w->windowTarget()->setFloating(m_target->floating());
+    w->m_group = m_self.lock();
+    m_groupPolicyFlags |= w->m_groupRules;
+    w->m_target->setSpaceGhost(m_target->space());
+    w->m_target->setFloating(m_target->floating());
 
     // a window in a group lives on the group's monitor/workspace
     if (const auto WS = m_target->workspace(); WS && w->m_workspace != WS) {
@@ -154,80 +150,17 @@ void CGroup::add(PHLWINDOW w, std::optional<size_t> index) {
     }
 
     applyWindowDecosAndUpdates(w);
-
-    // when groupbar:disable_when_only = true, after adding the second member of a group, update the size and position for the first member because it will get its groupbar and we don't want visual glitches.
-    if (GROUPBAR_DISABLED_ONLY_MEMBER)
-        g_pDecorationPositioner->forceRecalcFor(GROUPBAR_DISABLED_ONLY_MEMBER);
-
     updateWindowVisibility();
 
     if (FS_INTERNAL_MODE != Fullscreen::FSMODE_NONE) {
         Fullscreen::controller()->setFullscreenMode(w, FS_INTERNAL_MODE, std::nullopt, FS_WINDOW_IS_LAYOUT_HANDLED);
-        w->windowTarget()->warpPositionSize();
+        w->m_target->warpPositionSize();
 
         if (OLD_FULLSCREEN_WINDOW)
-            OLD_FULLSCREEN_WINDOW->windowTarget()->setPositionGlobal(w->windowTarget()->position());
+            OLD_FULLSCREEN_WINDOW->m_target->setPositionGlobal(w->m_target->position());
     }
 
     m_target->recalc();
-}
-
-void CGroup::replaceMember(PHLWINDOW oldWindow, PHLWINDOW newWindow, std::optional<Fullscreen::eFullscreenMode> internalMode, bool layoutManaged) {
-    if (!oldWindow || !newWindow || oldWindow == newWindow)
-        return;
-
-    const auto ITR = std::ranges::find(m_windows, oldWindow);
-    if (ITR == m_windows.end() || newWindow->grouping().group() == m_self)
-        return;
-
-    const auto SELF = m_self.lock();
-    const auto IDX  = sc<size_t>(std::distance(m_windows.begin(), ITR));
-
-    if (const auto SOURCE_GROUP = newWindow->grouping().group())
-        SOURCE_GROUP->remove(newWindow);
-
-    const auto FS_INTERNAL_MODE = internalMode.value_or(Fullscreen::controller()->getFullscreenModes(oldWindow).internal);
-    const bool HAD_FULLSCREEN   = FS_INTERNAL_MODE != Fullscreen::FSMODE_NONE;
-    const bool LAYOUT_MANAGED   = HAD_FULLSCREEN && (internalMode.has_value() ? layoutManaged : Fullscreen::controller()->layoutManagedFS(oldWindow));
-    const bool GROUP_FLOATING   = m_target->floating();
-    const auto GROUP_SPACE      = m_target->space();
-    const auto GROUP_WORKSPACE  = GROUP_SPACE ? GROUP_SPACE->workspace() : nullptr;
-
-    if (HAD_FULLSCREEN)
-        Fullscreen::controller()->setFullscreenMode(oldWindow, Fullscreen::FSMODE_NONE, std::nullopt, LAYOUT_MANAGED, Fullscreen::FULLSCREEN_MUTATION_TRANSFER);
-
-    const auto NEW_FS_INTERNAL_MODE = Fullscreen::controller()->getFullscreenModes(newWindow).internal;
-    if (NEW_FS_INTERNAL_MODE != Fullscreen::FSMODE_NONE)
-        Fullscreen::controller()->setFullscreenMode(newWindow, Fullscreen::FSMODE_NONE, std::nullopt, Fullscreen::controller()->layoutManagedFS(newWindow),
-                                                    Fullscreen::FULLSCREEN_MUTATION_TRANSFER);
-
-    if (newWindow->layoutTarget()->space())
-        g_layoutManager->removeTarget(newWindow->layoutTarget());
-
-    oldWindow->setInputBlocked(FOCUS_BLOCK_GROUP_INACTIVE, false);
-    *oldWindow->presentation().alpha(WINDOW_ALPHA_LAYOUT) = 1.F;
-    oldWindow->windowTarget()->setSpaceGhost(nullptr);
-    oldWindow->grouping().detach();
-    removeWindowDecos(oldWindow);
-
-    newWindow->grouping().attach(SELF);
-    m_groupPolicyFlags |= newWindow->grouping().rules();
-    newWindow->windowTarget()->setFloating(GROUP_FLOATING);
-    newWindow->windowTarget()->setSpaceGhost(GROUP_SPACE);
-
-    if (GROUP_WORKSPACE && newWindow->m_workspace != GROUP_WORKSPACE) {
-        newWindow->m_monitor = GROUP_WORKSPACE->m_monitor;
-        newWindow->moveToWorkspace(GROUP_WORKSPACE);
-    }
-
-    m_windows.at(IDX) = newWindow;
-    applyWindowDecosAndUpdates(newWindow);
-    updateWindowVisibility();
-
-    if (HAD_FULLSCREEN) {
-        Fullscreen::controller()->setFullscreenMode(newWindow, FS_INTERNAL_MODE, std::nullopt, LAYOUT_MANAGED, Fullscreen::FULLSCREEN_MUTATION_TRANSFER);
-        newWindow->windowTarget()->warpPositionSize();
-    }
 }
 
 void CGroup::remove(PHLWINDOW w, Math::eDirection dir, eRemoveFromGroupReason reason) {
@@ -245,33 +178,23 @@ void CGroup::remove(PHLWINDOW w, Math::eDirection dir, eRemoveFromGroupReason re
     if ((m_current >= *idx && idx != 0) || (m_current >= m_windows.size() - 1 && m_current > 0))
         m_current--;
 
-    auto g = m_self.lock(); // keep ref to avoid uaf after membership is detached
+    auto g = m_self.lock(); // keep ref to avoid uaf after w->m_group.reset()
 
-    w->grouping().detach();
+    w->m_group.reset();
     removeWindowDecos(w);
 
-    w->setInputBlocked(FOCUS_BLOCK_GROUP_INACTIVE, false);
-    *w->presentation().alpha(WINDOW_ALPHA_LAYOUT) = 1.F;
+    w->setInputBlocked(INPUT_BLOCK_GROUP_INACTIVE, false);
+    *w->alpha(WINDOW_ALPHA_LAYOUT) = 1.F;
 
     const bool REMOVING_GROUP = m_windows.size() <= 1;
 
     if (REMOVING_GROUP) {
-        w->windowTarget()->assignToSpace(nullptr);
-        g_layoutManager->switchTargets(m_target, w->windowTarget());
+        w->m_target->assignToSpace(nullptr);
+        g_layoutManager->switchTargets(m_target, w->m_target);
     }
 
     // we do it after the above because switchTargets expects this to be a valid group
     m_windows.erase(m_windows.begin() + *idx);
-
-    // if groupbar:disable_when_only is enabled and there is only one group member left, we need to fix its size because it will lose its groupbar.
-    static auto PDISABLE = CConfigValue<Config::BOOL>("group:groupbar:disable_when_only");
-    if (*PDISABLE && m_windows.size() == 1) {
-        if (const auto REMAINING_MEMBER = m_windows.at(0).lock()) {
-            const auto GROUPBAR = REMAINING_MEMBER->presentation().decoration(DECORATION_GROUPBAR);
-            GROUPBAR->updateWindow(REMAINING_MEMBER);
-            g_pDecorationPositioner->forceRecalcFor(REMAINING_MEMBER);
-        }
-    }
 
     if (!m_windows.empty())
         updateWindowVisibility();
@@ -293,7 +216,7 @@ void CGroup::remove(PHLWINDOW w, Math::eDirection dir, eRemoveFromGroupReason re
         // We don't need to assign a window to a new space if we intend to unmap it
         if (reason == REMOVE_FROM_GROUP_REASON_UNMAP_WINDOW)
             return;
-        w->windowTarget()->assignToSpace(m_target->space(), focalPoint);
+        w->m_target->assignToSpace(m_target->space(), focalPoint);
     }
 }
 
@@ -334,7 +257,8 @@ void CGroup::setCurrent(size_t idx) {
 
     if (IS_FULLSCREEN) {
         Fullscreen::controller()->setFullscreenMode(newWindow, FS_MODE_INTERNAL, std::nullopt, IS_LAYOUT_HANDLED);
-        newWindow->windowTarget()->warpPositionSize();
+        newWindow->m_target->warpPositionSize();
+        oldWindow->m_target->setPositionGlobal(newWindow->m_target->position()); // TODO: this is a hack and sucks
     }
 
     if (WASFOCUS)
@@ -384,45 +308,35 @@ const std::vector<PHLWINDOWREF>& CGroup::windows() const {
     return m_windows;
 }
 
-SP<Layout::CWindowGroupTarget> CGroup::target() const {
-    return m_target;
-}
-
 void CGroup::applyWindowDecosAndUpdates(PHLWINDOW x) {
-    static auto PDISABLE = CConfigValue<Config::BOOL>("group:groupbar:disable_when_only");
-    const auto  GROUPBAR = makeShared<CHyprGroupBarDecoration>(x);
-    if (*PDISABLE)
-        GROUPBAR->updateWindow(x);
-    x->presentation().addDecoration(GROUPBAR);
+    x->addWindowDeco(makeUnique<CHyprGroupBarDecoration>(x));
 
     x->m_ruleApplicator->propertiesChanged(Desktop::Rule::RULE_PROP_GROUP | Desktop::Rule::RULE_PROP_ON_WORKSPACE);
-    x->presentation().updateDecorations();
-    x->presentation().refreshValues();
+    x->updateWindowDecos();
+    x->updateDecorationValues();
 }
 
 void CGroup::removeWindowDecos(PHLWINDOW x) {
-    const auto GROUPBAR = x->presentation().decoration(DECORATION_GROUPBAR);
-    if (GROUPBAR)
-        x->presentation().removeDecoration(GROUPBAR.get());
+    x->removeWindowDeco(x->getDecorationByType(DECORATION_GROUPBAR));
 
     x->m_ruleApplicator->propertiesChanged(Desktop::Rule::RULE_PROP_GROUP | Desktop::Rule::RULE_PROP_ON_WORKSPACE);
-    x->presentation().updateDecorations();
-    x->presentation().refreshValues();
+    x->updateWindowDecos();
+    x->updateDecorationValues();
 }
 
 void CGroup::updateWindowVisibility() {
     for (size_t i = 0; i < m_windows.size(); ++i) {
         if (i == m_current) {
             auto& x = m_windows.at(i);
-            x->setInputBlocked(FOCUS_BLOCK_GROUP_INACTIVE, false);
-            *x->presentation().alpha(WINDOW_ALPHA_LAYOUT) = 1.F;
+            x->setInputBlocked(INPUT_BLOCK_GROUP_INACTIVE, false);
+            *x->alpha(WINDOW_ALPHA_LAYOUT) = 1.F;
             x->m_ruleApplicator->propertiesChanged(Desktop::Rule::RULE_PROP_GROUP | Desktop::Rule::RULE_PROP_ON_WORKSPACE);
-            x->presentation().updateDecorations();
-            x->presentation().refreshValues();
+            x->updateWindowDecos();
+            x->updateDecorationValues();
         } else {
             auto& x = m_windows.at(i);
-            x->setInputBlocked(FOCUS_BLOCK_GROUP_INACTIVE, true);
-            *x->presentation().alpha(WINDOW_ALPHA_LAYOUT) = 0.F;
+            x->setInputBlocked(INPUT_BLOCK_GROUP_INACTIVE, true);
+            *x->alpha(WINDOW_ALPHA_LAYOUT) = 0.F;
         }
     }
 
@@ -465,8 +379,8 @@ void CGroup::updateWorkspace(PHLWORKSPACE ws) {
         w->m_monitor = ws->m_monitor;
         w->moveToWorkspace(ws);
         w->updateToplevel();
-        w->presentation().updateDecorations();
-        w->windowTarget()->setSpaceGhost(ws->space());
+        w->updateWindowDecos();
+        w->m_target->setSpaceGhost(ws->m_space);
     }
 }
 

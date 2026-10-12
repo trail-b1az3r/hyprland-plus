@@ -2,22 +2,18 @@
 
 CPreBlurElement::CPreBlurElement() = default;
 
-bool CPreBlurElement::needsLiveBlur(Render::CRenderContext& ctx) {
+bool CPreBlurElement::needsLiveBlur() {
     return false;
 }
 
-bool CPreBlurElement::needsPrecomputeBlur(Render::CRenderContext& ctx) {
+bool CPreBlurElement::needsPrecomputeBlur() {
     return false;
 }
 
-bool CPreBlurElement::disableSimplification(Render::CRenderContext& ctx) {
+bool CPreBlurElement::disableSimplification() {
     return true;
 }
 
-bool CPreBlurElement::requiresFullDamage(Render::CRenderContext& ctx) {
-    return true;
-}
-
-bool CPreBlurElement::undiscardable(Render::CRenderContext& ctx) {
+bool CPreBlurElement::undiscardable() {
     return true;
 }
