@@ -416,7 +416,7 @@ struct SDotSet {
     std::string_view note;
 };
 
-static const std::array<SDotSet, 3> DOT_SETS = {{
+static const std::array<SDotSet, 4> DOT_SETS = {{
     {
         .name       = "jakoolit",
         .alias      = "hyprland-dots",
@@ -453,6 +453,19 @@ static const std::array<SDotSet, 3> DOT_SETS = {{
         .clearFirst = true,
         .note       = "Copied rather than stowed, so Halcyon's installer never writes into the clone. It does not install the "
                       "packages its README lists (pywal16, waybar, hyprlock and others).",
+    },
+    {
+        .name       = "ii",
+        .alias      = "illogical-impulse",
+        .title      = "illogical-impulse (end-4/dots-hyprland)",
+        .url        = "https://github.com/end-4/dots-hyprland",
+        .configDir  = "dots/.config",
+        .binDir     = "",
+        .install    = "git -C \"$DIR\" submodule update --init --recursive && cd \"$DIR\" && ./setup install",
+        .clearFirst = false,
+        .note       = "The base of Halcyon: end-4's own installer, run from its clone. It installs the packages, asks questions "
+                      "in the terminal and backs up its own files. Read it first with: git clone --depth 1 "
+                      "https://github.com/end-4/dots-hyprland && less dots-hyprland/setup",
     },
 }};
 
@@ -492,7 +505,7 @@ static std::string dotSetScript(const SDotSet& set) {
 }
 
 static int dotsUsage() {
-    std::println("usage: hyprctl dots [plus | jakoolit | mlfw | gdots] [--install]");
+    std::println("usage: hyprctl dots [plus | ii | jakoolit | mlfw | gdots] [--install]");
     std::println("  hyprctl dots                 list the sets");
     std::println("  hyprctl dots <set>           describe what installing it would do");
     std::println("  hyprctl dots <set> --install clone it, back up the config it replaces, and install it (run in a terminal)");
