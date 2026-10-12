@@ -953,7 +953,7 @@ bool CWindow::isAllowedOverFullscreen() const {
     if (!m_workspace)
         return false;
 
-    if (m_self == Fullscreen::controller()->getFullscreenWindow(m_workspace, true) || m_pinned || m_allowedOverFullscreen)
+    if (m_self == Fullscreen::controller()->getFullscreenWindow(m_workspace, true) || m_pinned || m_allowedOverFullscreen || m_ruleApplicator->superposition().valueOrDefault())
         return true;
 
     const auto FSWINDOW = Fullscreen::controller()->getFullscreenWindow(m_workspace);

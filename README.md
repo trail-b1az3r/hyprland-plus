@@ -89,6 +89,18 @@ Source: `Actions::miniWindow` in `src/config/shared/actions/ConfigActions.cpp`, 
 `processMouseDownNormal` (`src/managers/input/InputManager.cpp`), `isMini` and `setMini` in
 `src/desktop/view/window/Window.hpp`, and the Lua binding in `src/config/lua/bindings/LuaBindingsDispatchers.cpp`.
 
+## Superposition windows: the `superposition` rule
+
+A superposition window stays tiled, but it is drawn above a fullscreen floating window instead of being hidden
+by it. Use it for a small tiled window that should stay visible while another window is fullscreen.
+
+```lua
+hl.window_rule({ match = { class = "^(kitty)$" }, superposition = true })
+```
+
+It is the same flag that lets a floating window draw over fullscreen. Source: `superposition` in
+`src/desktop/rule/windowRule/` and `isAllowedOverFullscreen` in `src/desktop/view/Window.cpp`.
+
 ## Version string
 
 `hyprland --version` reports `hyprland-plus` in place of `Hyprland`. The binary and the config directory names
