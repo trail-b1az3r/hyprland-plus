@@ -135,7 +135,8 @@ set(GLES_VERSION "GLES3")
 find_package(OpenGL REQUIRED COMPONENTS ${GLES_VERSION})
 find_package(glslang CONFIG REQUIRED)
 
-find_package(glaze 7...<8 QUIET)
+# nixpkgs ships glaze 8, so accept 8 as well. The build only uses glz::read_json and glz::generic from it.
+find_package(glaze 7...<9 QUIET)
 if(NOT glaze_FOUND)
   set(GLAZE_VERSION v7.2.0)
   message(STATUS "glaze dependency not found, retrieving ${GLAZE_VERSION} with FetchContent")

@@ -8,6 +8,9 @@ on:
     branches:
       - 'main'
 
+permissions:
+  contents: write
+
 jobs:
   main:
     name: Build man pages
@@ -16,10 +19,10 @@ jobs:
     - name: Install deps
       run: sudo apt install pandoc
 
+    # The repository has no PAT secret, so this used the empty token and failed. The job's own token can
+    # push the generated pages; "permissions" above gives it write access to the repository.
     - name: Clone repository
       uses: actions/checkout@v6
-      with:
-        token: ${{ secrets.PAT }}
 
     - name: Build man pages
       run: make man
