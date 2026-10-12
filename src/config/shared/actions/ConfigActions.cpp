@@ -317,11 +317,11 @@ ActionResult Actions::miniWindow(eTogglableAction action, std::optional<PHLWINDO
         window->m_miniRestoreBox = LAYOUTTARGET->position();
 
         // Keep the top-left corner where the window was, pulled back onto the monitor if the mini size would leave it.
-        const CBox MONBOX = PMONITOR->logicalBox();
+        const CBox     MONBOX = PMONITOR->logicalBox();
         const Vector2D SIZE{sc<double>(*PMINIWIDTH), sc<double>(*PMINIHEIGHT)};
-        const auto      POS = LAYOUTTARGET->position().pos();
-        const double    MAXX = std::max(MONBOX.x, MONBOX.x + MONBOX.width - SIZE.x);
-        const double    MAXY = std::max(MONBOX.y, MONBOX.y + MONBOX.height - SIZE.y);
+        const auto     POS  = LAYOUTTARGET->position().pos();
+        const double   MAXX = std::max(MONBOX.x, MONBOX.x + MONBOX.width - SIZE.x);
+        const double   MAXY = std::max(MONBOX.y, MONBOX.y + MONBOX.height - SIZE.y);
 
         window->m_mini = true;
         LAYOUTTARGET->setPositionGlobal(CBox{std::clamp(POS.x, MONBOX.x, MAXX), std::clamp(POS.y, MONBOX.y, MAXY), SIZE.x, SIZE.y});
