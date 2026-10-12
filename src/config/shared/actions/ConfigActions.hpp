@@ -42,6 +42,8 @@ namespace Config::Actions {
     ActionResult pseudoWindow(eTogglableAction action, std::optional<PHLWINDOW> window = std::nullopt /* Active */);
     ActionResult pinWindow(eTogglableAction action, std::optional<PHLWINDOW> window = std::nullopt /* Active */);
     ActionResult miniWindow(eTogglableAction action, std::optional<PHLWINDOW> window = std::nullopt /* Active */);
+    // edge is a Layout::eRectCorner flag (CORNER_LEFT, CORNER_RIGHT, CORNER_TOP or CORNER_BOTTOM); amount is in pixels, negative to shrink.
+    ActionResult resizeEdge(uint8_t edge, double amount, std::optional<PHLWINDOW> window = std::nullopt /* Active */);
     ActionResult fullscreenWindow(Fullscreen::eFullscreenMode mode, bool layoutAware, std::optional<PHLWINDOW> window = std::nullopt /* Active */);
     ActionResult fullscreenWindow(Fullscreen::eFullscreenMode internalMode, Fullscreen::eFullscreenMode clientMode, bool layoutAware,
                                   std::optional<PHLWINDOW> window = std::nullopt /* Active */);

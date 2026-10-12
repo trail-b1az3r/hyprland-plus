@@ -101,10 +101,30 @@ hl.window_rule({ match = { class = "^(kitty)$" }, superposition = true })
 It is the same flag that lets a floating window draw over fullscreen. Source: `superposition` in
 `src/desktop/rule/windowRule/` and `isAllowedOverFullscreen` in `src/desktop/view/Window.cpp`.
 
+## Plustile windows: `plustile` and `hl.dsp.window.resize_edge`
+
+A plustile window is a tiled window that can be resized from each of its four edges. Only plustile windows can be
+resized this way, so every other tile behaves as before.
+
+```lua
+hl.window_rule({ match = { class = "^(kitty)$" }, plustile = true })
+hl.bind("SUPER + ALT + Right", hl.dsp.window.resize_edge({ edge = "right", amount = 40 }))
+```
+
+- `edge` is `left`, `right`, `top` or `bottom`. It moves that one edge outwards by `amount` pixels, so the
+  neighbouring tiles give up that space. A negative `amount` moves the edge inwards.
+- Other edges of the tile do not move, and the window stays tiled.
+- The dotfiles bind the four edges to `SUPER + ALT + arrow` (grow) and `SUPER + ALT + SHIFT + arrow` (shrink).
+- Not done yet: an automatic mode that resizes plustile windows by itself.
+
+Source: `plustile` in `src/desktop/rule/windowRule/`, `resizeEdge` in `src/config/shared/actions/ConfigActions.cpp`,
+and `hl.dsp.window.resize_edge` in `src/config/lua/bindings/LuaBindingsDispatchers.cpp`.
+
 ## Version string
 
-`hyprland --version` reports `hyprland-plus` in place of `Hyprland`. The binary and the config directory names
-are unchanged, so existing configs and session files keep working.
+`hyprland --version` reports `hyprland-plus 0.56.2.p1`, from the `PLUS_VERSION` file. The fork is based on upstream
+0.56.2, and `VERSION` keeps the numeric version that CMake needs. The binary and the config directory names are
+unchanged, so existing configs and session files keep working.
 
 ## Logo
 

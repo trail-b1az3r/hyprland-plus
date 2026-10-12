@@ -277,6 +277,39 @@ ActionResult Actions::miniWindow(eTogglableAction action, std::optional<PHLWINDO
     return {};
 }
 
+ActionResult Actions::resizeEdge(uint8_t edgeFlag, double amount, std::optional<PHLWINDOW> w) {
+    auto window = xtract(w);
+    if (!window)
+        return {};
+
+    if (!window->m_ruleApplicator->plustile().valueOrDefault())
+        return actionError("Window is not a plustile window", eActionErrorLevel::WARNING, eActionErrorCode::INVALID_STATE);
+
+    if (Fullscreen::controller()->isFullscreen(window))
+        return actionError("Window is fullscreen", eActionErrorLevel::WARNING, eActionErrorCode::INVALID_STATE);
+
+    const auto LAYOUTTARGET = window->layoutTarget();
+    if (!LAYOUTTARGET)
+        return actionError("Window has no layout target", eActionErrorLevel::WARNING, eActionErrorCode::INVALID_STATE);
+
+    // An edge grows the window by moving outwards: right and bottom with a positive delta, left and top with a negative one.
+    const auto EDGE = sc<Layout::eRectCorner>(edgeFlag);
+    Vector2D   delta{0, 0};
+    if (EDGE == Layout::CORNER_RIGHT)
+        delta.x = amount;
+    else if (EDGE == Layout::CORNER_LEFT)
+        delta.x = -amount;
+    else if (EDGE == Layout::CORNER_BOTTOM)
+        delta.y = amount;
+    else if (EDGE == Layout::CORNER_TOP)
+        delta.y = -amount;
+    else
+        return actionError("Not a single edge", eActionErrorLevel::WARNING, eActionErrorCode::INVALID_ARGUMENT);
+
+    g_layoutManager->resizeTarget(delta, LAYOUTTARGET, EDGE);
+    return {};
+}
+
 ActionResult Actions::pinWindow(eTogglableAction action, std::optional<PHLWINDOW> w) {
     auto window = xtract(w);
     if (!window)

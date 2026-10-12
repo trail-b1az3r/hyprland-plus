@@ -58,6 +58,7 @@ static const std::vector<std::string> EFFECT_STRINGS = {
     "force_rgbx",             //
     "sync_fullscreen",        //
     "superposition",          //
+    "plustile",               //
     "immediate",              //
     "xray",                   //
     "render_unfocused",       //

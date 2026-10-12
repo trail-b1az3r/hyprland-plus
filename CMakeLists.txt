@@ -14,6 +14,11 @@ include(CheckIncludeFile)
 include(GNUInstallDirs)
 
 set(HYPRLAND_VERSION ${VER})
+
+# The version this fork reports (hyprland --version). VERSION stays numeric, because project() needs it.
+file(READ "${CMAKE_SOURCE_DIR}/PLUS_VERSION" PLUS_VER_RAW)
+string(STRIP ${PLUS_VER_RAW} HYPRLAND_PLUS_VERSION)
+add_compile_definitions(HYPRLAND_PLUS_VERSION="${HYPRLAND_PLUS_VERSION}")
 set(PREFIX ${CMAKE_INSTALL_PREFIX})
 set(INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR})
 set(BINDIR ${CMAKE_INSTALL_BINDIR})

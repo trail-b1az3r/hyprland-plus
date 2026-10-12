@@ -14,6 +14,7 @@
 #include "../../../devices/IKeyboard.hpp"
 #include "../../../desktop/rule/windowRule/WindowRule.hpp"
 #include "config/shared/actions/ConfigActions.hpp"
+#include "layout/LayoutManager.hpp"
 
 using namespace Config;
 using namespace Config::Lua;
@@ -1040,6 +1041,40 @@ static int hlWindowMini(lua_State* L) {
     return 1;
 }
 
+static int dsp_resizeEdge(lua_State* L) {
+    return Internal::checkResult(L, CA::resizeEdge(sc<uint8_t>(lua_tonumber(L, lua_upvalueindex(1))), lua_tonumber(L, lua_upvalueindex(2)), Internal::windowFromUpval(L, 3)));
+}
+
+// hl.dsp.window.resize_edge({ edge = "right", amount = 40 }): moves one edge of a plustile window outwards by
+// amount pixels (negative to move it inwards). Only plustile windows can be resized this way.
+static int hlWindowResizeEdge(lua_State* L) {
+    if (!lua_istable(L, 1))
+        return Internal::configError(L, "hl.window.resize_edge: expected a table, e.g. { edge = \"right\", amount = 40 }");
+
+    auto edgeStr = Internal::tableOptStr(L, 1, "edge");
+    auto amount  = Internal::tableOptNum(L, 1, "amount");
+    if (!edgeStr || !amount)
+        return Internal::configError(L, "hl.window.resize_edge: needs edge (left, right, top or bottom) and amount in pixels");
+
+    uint8_t edge = 0;
+    if (*edgeStr == "left")
+        edge = Layout::CORNER_LEFT;
+    else if (*edgeStr == "right")
+        edge = Layout::CORNER_RIGHT;
+    else if (*edgeStr == "top")
+        edge = Layout::CORNER_TOP;
+    else if (*edgeStr == "bottom")
+        edge = Layout::CORNER_BOTTOM;
+    else
+        return Internal::configError(L, "hl.window.resize_edge: invalid edge \"{}\" (expected left, right, top or bottom)", *edgeStr);
+
+    lua_pushnumber(L, edge);
+    lua_pushnumber(L, *amount);
+    Internal::pushWindowUpval(L, 1);
+    lua_pushcclosure(L, dsp_resizeEdge, 3);
+    return 1;
+}
+
 static int hlWindowBringToTop(lua_State* L) {
     lua_pushcclosure(L, dsp_bringToTop, 0);
     return 1;
@@ -1399,6 +1434,7 @@ void Internal::registerDispatcherBindings(lua_State* L) {
         Internal::setFn(L, "deny_from_group", hlWindowDenyFromGroup);
         Internal::setFn(L, "drag", hlWindowDrag);
         Internal::setFn(L, "resize", hlWindowResize);
+        Internal::setFn(L, "resize_edge", hlWindowResizeEdge);
         lua_setfield(L, -2, "window");
 
         lua_newtable(L);
