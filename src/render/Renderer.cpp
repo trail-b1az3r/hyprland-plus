@@ -440,8 +440,9 @@ static void renderDragGuide(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace) {
     if (!*PDRAGGUIDE || pMonitor->m_activeWorkspace != pWorkspace)
         return;
 
-    const auto DRAG   = g_layoutManager->dragController();
-    const auto TARGET = DRAG->target();
+    // A reference: dragController() returns a unique pointer, and copying it does not compile.
+    const auto& DRAG   = g_layoutManager->dragController();
+    const auto  TARGET = DRAG->target();
     if (!TARGET || !TARGET->window() || TARGET->floating() || DRAG->mode() != MBIND_MOVE || !DRAG->dragThresholdReached())
         return;
 
