@@ -541,8 +541,8 @@ std::vector<SP<IValue>> Values::getConfigValues() {
                 {.min = 0, .max = std::numeric_limits<int>::max()}),
         MS<Bool>("binds:drag_keep_grab_point",
                  "If enabled, a tiled or fullscreen window that becomes floating while dragged keeps the exact pixel offset between the cursor and the window, "
-                 "so the grab point does not move. When off, the window is centred on the cursor.",
-                 false),
+                 "so the grab point does not move. When off, the window is centred on the cursor (upstream behaviour).",
+                 true),
         MS<Int>("binds:mini_width", "Width in pixels of a mini window (hl.dsp.window.mini).", 96, {.min = 16, .max = 8192}),
         MS<Int>("binds:mini_height", "Height in pixels of a mini window (hl.dsp.window.mini).", 54, {.min = 16, .max = 8192}),
         MS<Bool>("binds:drag_guide", "While a tiled window is dragged, tint the tile under the cursor: the tile it will swap with.", true),

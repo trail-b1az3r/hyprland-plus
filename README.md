@@ -47,7 +47,7 @@ Upstream centres a tiled or fullscreen window on the cursor when it becomes floa
 window jumps, and this happens with apps that draw their own top bar and ask Hyprland to move them, such as
 Firefox and Dolphin.
 
-- Type: boolean, default `false`. Off keeps the upstream behaviour (centre on the cursor).
+- Type: boolean, default `true`. Off keeps the upstream behaviour (centre on the cursor, which made the window jump).
 - On: the window keeps the exact pixel offset between the cursor and the window, so the grab point does not
   move. If the offset is larger than the new window, it is clamped to the window's edge.
 

@@ -123,10 +123,14 @@ bool CDragStateController::updateDragWindow() {
         DRAGGINGTARGET->rememberFloatingSize((DRAGGINGTARGET->position().size() * 0.8489).clamp(MINSIZE, Vector2D{}).floor());
 
         if (m_dragThresholdReached) {
+            g_layoutManager->changeFloatingMode(DRAGGINGTARGET);
+
+            // Floating places the window in the middle of the screen, which made it jump. Put it back under the cursor
+            // now, so the drag starts from where the window really is. Its position is read again below.
             const auto MOUSECOORDS = g_pInputManager->getMouseCoordsInternal();
             const auto SIZE        = DRAGGINGTARGET->position().size();
             DRAGGINGTARGET->setPositionGlobal(CBox{MOUSECOORDS - floatingGrab(*PKEEPGRABPOINT, PRE_DRAG_BOX, MOUSECOORDS, SIZE), SIZE});
-            g_layoutManager->changeFloatingMode(DRAGGINGTARGET);
+            DRAGGINGTARGET->warpPositionSize();
             m_draggingTiled = true;
         }
     }
