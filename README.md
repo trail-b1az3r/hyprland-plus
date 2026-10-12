@@ -98,8 +98,29 @@ by it. Use it for a small tiled window that should stay visible while another wi
 hl.window_rule({ match = { class = "^(kitty)$" }, superposition = true })
 ```
 
-It is the same flag that lets a floating window draw over fullscreen. Source: `superposition` in
-`src/desktop/rule/windowRule/` and `isAllowedOverFullscreen` in `src/desktop/view/Window.cpp`.
+A superposition window is kept out of the tile tree and sits on a thin strip at one edge of the screen. The
+strip is shared by all superposition windows on the workspace, stacked along the edge, and it stays above a
+fullscreen floating window.
+
+- `superposition:edge`: 0 left, 1 right (default), 2 top, 3 bottom.
+- `superposition:size`: the strip's width or height, as a fraction of the screen (default 0.12).
+- `superposition:reserve`: `false` (default) draws the strip over the tiles. `true` takes the strip out of the
+  tiles' area, so they make room for it.
+
+```lua
+hl.config({ superposition = { edge = 1, size = 0.12, reserve = true } })
+```
+
+Source: `CSpace::placeSuperpositions` and `superpositionStrip` in `src/layout/space/Space.cpp`, and
+`isAllowedOverFullscreen` in `src/desktop/view/Window.cpp`.
+
+## Drag guide: `binds:drag_guide`
+
+While a tiled window is dragged, the tile under the cursor is tinted. That is the tile the dragged window swaps
+with when it is dropped. Default `true`; set it to `false` to turn it off. Source: `renderDragGuide` in
+`src/render/Renderer.cpp`.
+
+Not done yet: a half-tile guide that splits the tile on drop. Dropping still swaps the tiles.
 
 ## Plustile windows: `plustile` and `hl.dsp.window.resize_edge`
 
@@ -115,7 +136,8 @@ hl.bind("SUPER + ALT + Right", hl.dsp.window.resize_edge({ edge = "right", amoun
   neighbouring tiles give up that space. A negative `amount` moves the edge inwards.
 - Other edges of the tile do not move, and the window stays tiled.
 - The dotfiles bind the four edges to `SUPER + ALT + arrow` (grow) and `SUPER + ALT + SHIFT + arrow` (shrink).
-- Not done yet: an automatic mode that resizes plustile windows by itself.
+- `hl.dsp.window.fit_plustile({ window? })` fits a plustile window to its neighbours: each edge is pushed outwards
+  a step at a time, until the tiles on that side can give no more. The dotfiles bind it to `SUPER + ALT + F`.
 
 Source: `plustile` in `src/desktop/rule/windowRule/`, `resizeEdge` in `src/config/shared/actions/ConfigActions.cpp`,
 and `hl.dsp.window.resize_edge` in `src/config/lua/bindings/LuaBindingsDispatchers.cpp`.

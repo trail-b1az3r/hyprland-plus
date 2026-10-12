@@ -277,6 +277,25 @@ ActionResult Actions::miniWindow(eTogglableAction action, std::optional<PHLWINDO
     return {};
 }
 
+// Moves one edge of a target outwards by amount pixels: right and bottom with a positive delta, left and top with a
+// negative one. Returns false if edge is not a single edge.
+static bool moveEdgeOutwards(const SP<Layout::ITarget>& target, Layout::eRectCorner edge, double amount) {
+    Vector2D delta{0, 0};
+    if (edge == Layout::CORNER_RIGHT)
+        delta.x = amount;
+    else if (edge == Layout::CORNER_LEFT)
+        delta.x = -amount;
+    else if (edge == Layout::CORNER_BOTTOM)
+        delta.y = amount;
+    else if (edge == Layout::CORNER_TOP)
+        delta.y = -amount;
+    else
+        return false;
+
+    g_layoutManager->resizeTarget(delta, target, edge);
+    return true;
+}
+
 ActionResult Actions::resizeEdge(uint8_t edgeFlag, double amount, std::optional<PHLWINDOW> w) {
     auto window = xtract(w);
     if (!window)
@@ -292,21 +311,43 @@ ActionResult Actions::resizeEdge(uint8_t edgeFlag, double amount, std::optional<
     if (!LAYOUTTARGET)
         return actionError("Window has no layout target", eActionErrorLevel::WARNING, eActionErrorCode::INVALID_STATE);
 
-    // An edge grows the window by moving outwards: right and bottom with a positive delta, left and top with a negative one.
-    const auto EDGE = sc<Layout::eRectCorner>(edgeFlag);
-    Vector2D   delta{0, 0};
-    if (EDGE == Layout::CORNER_RIGHT)
-        delta.x = amount;
-    else if (EDGE == Layout::CORNER_LEFT)
-        delta.x = -amount;
-    else if (EDGE == Layout::CORNER_BOTTOM)
-        delta.y = amount;
-    else if (EDGE == Layout::CORNER_TOP)
-        delta.y = -amount;
-    else
+    if (!moveEdgeOutwards(LAYOUTTARGET, sc<Layout::eRectCorner>(edgeFlag), amount))
         return actionError("Not a single edge", eActionErrorLevel::WARNING, eActionErrorCode::INVALID_ARGUMENT);
 
-    g_layoutManager->resizeTarget(delta, LAYOUTTARGET, EDGE);
+    return {};
+}
+
+// Gives a plustile window the free space around it: each edge is pushed outwards a step at a time, and stops when
+// its neighbours can give no more.
+ActionResult Actions::plustileFit(std::optional<PHLWINDOW> w) {
+    auto window = xtract(w);
+    if (!window)
+        return {};
+
+    if (!window->m_ruleApplicator->plustile().valueOrDefault())
+        return actionError("Window is not a plustile window", eActionErrorLevel::WARNING, eActionErrorCode::INVALID_STATE);
+
+    if (Fullscreen::controller()->isFullscreen(window))
+        return actionError("Window is fullscreen", eActionErrorLevel::WARNING, eActionErrorCode::INVALID_STATE);
+
+    const auto LAYOUTTARGET = window->layoutTarget();
+    if (!LAYOUTTARGET)
+        return actionError("Window has no layout target", eActionErrorLevel::WARNING, eActionErrorCode::INVALID_STATE);
+
+    static constexpr double STEP      = 8.0;
+    static constexpr int    MAX_STEPS = 500;
+
+    for (const auto EDGE : {Layout::CORNER_RIGHT, Layout::CORNER_BOTTOM, Layout::CORNER_LEFT, Layout::CORNER_TOP}) {
+        for (int i = 0; i < MAX_STEPS; ++i) {
+            const CBox BEFORE = LAYOUTTARGET->position();
+            moveEdgeOutwards(LAYOUTTARGET, EDGE, STEP);
+            const CBox AFTER = LAYOUTTARGET->position();
+
+            if (AFTER.x == BEFORE.x && AFTER.y == BEFORE.y && AFTER.w == BEFORE.w && AFTER.h == BEFORE.h)
+                break;
+        }
+    }
+
     return {};
 }
 

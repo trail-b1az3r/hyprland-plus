@@ -545,6 +545,13 @@ std::vector<SP<IValue>> Values::getConfigValues() {
                  false),
         MS<Int>("binds:mini_width", "Width in pixels of a mini window (hl.dsp.window.mini).", 96, {.min = 16, .max = 8192}),
         MS<Int>("binds:mini_height", "Height in pixels of a mini window (hl.dsp.window.mini).", 54, {.min = 16, .max = 8192}),
+        MS<Bool>("binds:drag_guide", "While a tiled window is dragged, tint the tile under the cursor: the tile it will swap with.", true),
+        MS<Int>("superposition:edge", "Screen edge superposition windows tile to: 0 left, 1 right, 2 top, 3 bottom.", 1,
+                {.min = 0, .max = 3, .refresh = Supplementary::REFRESH_LAYOUTS}),
+        MS<Float>("superposition:size", "Width (left/right) or height (top/bottom) of the superposition strip, as a fraction of the screen.", 0.12,
+                  {.min = 0.02, .max = 0.5, .refresh = Supplementary::REFRESH_LAYOUTS}),
+        MS<Bool>("superposition:reserve", "If enabled, the strip comes out of the tiles' area and they make room for it. If disabled, the strip is drawn over the tiles.", false,
+                 {.refresh = Supplementary::REFRESH_LAYOUTS}),
 
         /*
          * xwayland:

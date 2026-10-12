@@ -1041,6 +1041,17 @@ static int hlWindowMini(lua_State* L) {
     return 1;
 }
 
+static int dsp_plustileFit(lua_State* L) {
+    return Internal::checkResult(L, CA::plustileFit(Internal::windowFromUpval(L, 1)));
+}
+
+// hl.dsp.window.fit_plustile({ window? }): gives a plustile window the free space around it, from its neighbours.
+static int hlWindowFitPlustile(lua_State* L) {
+    Internal::pushWindowUpval(L, 1);
+    lua_pushcclosure(L, dsp_plustileFit, 1);
+    return 1;
+}
+
 static int dsp_resizeEdge(lua_State* L) {
     return Internal::checkResult(L, CA::resizeEdge(sc<uint8_t>(lua_tonumber(L, lua_upvalueindex(1))), lua_tonumber(L, lua_upvalueindex(2)), Internal::windowFromUpval(L, 3)));
 }
@@ -1435,6 +1446,7 @@ void Internal::registerDispatcherBindings(lua_State* L) {
         Internal::setFn(L, "drag", hlWindowDrag);
         Internal::setFn(L, "resize", hlWindowResize);
         Internal::setFn(L, "resize_edge", hlWindowResizeEdge);
+        Internal::setFn(L, "fit_plustile", hlWindowFitPlustile);
         lua_setfield(L, -2, "window");
 
         lua_newtable(L);
