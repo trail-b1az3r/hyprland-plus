@@ -1,0 +1,134 @@
+name: Releases
+
+# Two releases, both source archives built from the branch named in BRANCH below.
+#
+#   hyprland-plus <version>   The stable release. It is made once for each version in PLUS_VERSION, on a tag
+#                             v<version> at the branch's head, and marked latest. If that release already exists,
+#                             nothing is made.
+#   hyprland-plus-git         The nightly. A prerelease built from the branch each night. It replaces the previous
+#                             one, and the name matches the AUR's -git package. If the branch has not changed since
+#                             the last one, the run stops early.
+#
+# Run it by hand with workflow_dispatch to build now. Scheduled runs only start once this file is on the default
+# branch (main).
+
+on:
+  schedule:
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  BRANCH: halcyon-0.56.2
+
+concurrency:
+  group: plus-releases
+  cancel-in-progress: false
+
+jobs:
+  stable:
+    name: Publish hyprland-plus for PLUS_VERSION
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.BRANCH }}
+          submodules: recursive
+
+      - name: Work out the version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          ver="$(tr -d '[:space:]' < PLUS_VERSION)"
+          tag="v$ver"
+          echo "VER=$ver" >> "$GITHUB_ENV"
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+          echo "SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "SKIP=true" >> "$GITHUB_ENV"
+            echo "Release $tag already exists. Nothing to do."
+          else
+            echo "SKIP=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build the source archive
+        if: env.SKIP != 'true'
+        run: scripts/release-source.sh "hyprland-plus-$VER" "$RUNNER_TEMP/release"
+
+      - name: Publish the stable release
+        if: env.SKIP != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/release"
+          gh release create "$TAG" \
+            "$out/hyprland-plus-$VER.tar.gz" \
+            "$out/hyprland-plus-$VER.tar.gz.sha256" \
+            --target "$SHA" \
+            --latest \
+            --title "hyprland-plus $VER" \
+            --notes "Hyprland 0.56.2 with the Halcyon additions: mini windows, superposition windows, plustile windows and a drag fix. Built from $BRANCH at commit ${SHA:0:12}. Check a download with \`sha256sum -c hyprland-plus-$VER.tar.gz.sha256\`."
+
+  nightly:
+    name: Publish hyprland-plus-git
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.BRANCH }}
+          submodules: recursive
+
+      - name: Work out what to build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          sha="$(git rev-parse HEAD)"
+          short="${sha:0:12}"
+          ver="$(tr -d '[:space:]' < PLUS_VERSION)"
+          echo "SHA=$sha" >> "$GITHUB_ENV"
+          echo "SHORT=$short" >> "$GITHUB_ENV"
+          echo "VER=$ver" >> "$GITHUB_ENV"
+          echo "LABEL=hyprland-plus-git-$(date -u +%Y%m%d)-$short" >> "$GITHUB_ENV"
+          echo "DATE_UTC=$(date -u '+%Y-%m-%d %H:%M UTC')" >> "$GITHUB_ENV"
+
+          skip=false
+          if [[ "$EVENT" != "workflow_dispatch" ]]; then
+            if gh release view hyprland-plus-git --json body --jq .body 2>/dev/null | grep -q "commit $short"; then
+              skip=true
+            fi
+          fi
+          echo "SKIP=$skip" >> "$GITHUB_ENV"
+          if [[ "$skip" == true ]]; then
+            echo "$BRANCH is still at $short, which the nightly was built from. Nothing to do."
+          fi
+
+      - name: Build the source archive
+        if: env.SKIP != 'true'
+        run: scripts/release-source.sh "$LABEL" "$RUNNER_TEMP/release"
+
+      - name: Replace the nightly release
+        if: env.SKIP != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/release"
+          # Deleting the release also deletes its tag, so the new tag points at this commit.
+          gh release delete hyprland-plus-git --yes --cleanup-tag 2>/dev/null || true
+          gh release create hyprland-plus-git \
+            "$out/$LABEL.tar.gz" \
+            "$out/$LABEL.tar.gz.sha256" \
+            --target "$SHA" \
+            --prerelease \
+            --title "hyprland-plus-git ($DATE_UTC)" \
+            --notes "Built from $BRANCH at $DATE_UTC. This is commit $SHORT, version $VER. Expect bugs; use the stable hyprland-plus release for daily use."

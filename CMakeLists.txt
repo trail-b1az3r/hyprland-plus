@@ -135,8 +135,14 @@ set(GLES_VERSION "GLES3")
 find_package(OpenGL REQUIRED COMPONENTS ${GLES_VERSION})
 find_package(glslang CONFIG REQUIRED)
 
-# nixpkgs ships glaze 8, so accept 8 as well. The build only uses glz::read_json and glz::generic from it.
-find_package(glaze 7...<9 QUIET)
+# nixpkgs ships glaze 8. Its package version file is SameMajorVersion, which only compares against the lowest
+# version asked for, so a range like 7...<9 never matches it. Ask for any version and check it here instead.
+# The build only uses glz::read_json and glz::generic, which 7 and 8 both have.
+find_package(glaze QUIET)
+if(glaze_FOUND AND (glaze_VERSION VERSION_LESS 7 OR glaze_VERSION VERSION_GREATER_EQUAL 9))
+  message(STATUS "glaze ${glaze_VERSION} found, but this build needs 7 or 8")
+  set(glaze_FOUND FALSE)
+endif()
 if(NOT glaze_FOUND)
   set(GLAZE_VERSION v7.2.0)
   message(STATUS "glaze dependency not found, retrieving ${GLAZE_VERSION} with FetchContent")

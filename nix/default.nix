@@ -125,6 +125,7 @@ customStdenv.mkDerivation (finalAttrs: {
             ../src
             ../start
             ../systemd
+            ../PLUS_VERSION
             ../VERSION
             (fs.fileFilter (file: file.hasExt "1") ../docs)
             (fs.fileFilter (file: file.hasExt "conf" || file.hasExt "in" || file.hasExt "lua" ) ../example)
