@@ -208,6 +208,9 @@ tested on a running session yet. Test a drag of a tiled window and a click on a 
 
 # Special Thanks
 
+Hyprland is by vaxerski and the Hyprland contributors. The full credits, and the licences of the bundled
+code, are in [CREDITS.md](CREDITS.md).
+
 <br>
 
 **[wlroots]** - *For powering Hyprland in the past*

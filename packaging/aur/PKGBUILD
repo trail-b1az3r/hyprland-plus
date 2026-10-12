@@ -1,0 +1,74 @@
+# Maintainer: ray0rfire
+# Dependency names are taken from the CMake lookups in CMakeLists.txt and are not checked against
+# the official repositories yet. Run `namcap PKGBUILD` and `makepkg -s` on Arch before publishing.
+pkgname=hyprland-plus
+pkgver=0.56.2.p1
+pkgrel=1
+pkgdesc="Hyprland 0.56.2 with the Halcyon additions: mini windows, superposition windows, plustile windows and a drag fix"
+arch=('x86_64')
+url="https://github.com/trail-b1az3r/hyprland-plus"
+license=('BSD-3-Clause')
+depends=(
+  'aquamarine'
+  'cairo'
+  'hyprcursor'
+  'hyprgraphics'
+  'hyprlang'
+  'hyprutils'
+  'lcms2'
+  'libdrm'
+  'libeis'
+  'libinput'
+  'libxcursor'
+  'libxkbcommon'
+  'lua'
+  'mesa'
+  'muparser'
+  'pango'
+  'pixman'
+  're2'
+  'util-linux-libs'
+  'wayland'
+  'xcb-util-errors'
+  'xorg-xwayland'
+  'glib2'
+)
+makedepends=(
+  'cmake'
+  'git'
+  'glslang'
+  'hyprland-protocols'
+  'hyprwayland-scanner'
+  'wayland-protocols'
+)
+provides=('hyprland')
+conflicts=('hyprland')
+source=("git+https://github.com/trail-b1az3r/hyprland-plus.git#branch=halcyon-0.56.2")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "$pkgname"
+  # udis86 and hyprland-protocols are git submodules, and CMake builds udis86 from its
+  # submodule when no system copy is found. makepkg does not fetch submodules by itself.
+  git submodule update --init --recursive
+}
+
+build() {
+  cd "$pkgname"
+  cmake -B build -S . \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON \
+    -Wno-dev
+  cmake --build build --config Release --target all
+}
+
+package() {
+  cd "$pkgname"
+  DESTDIR="$pkgdir" cmake --install build
+
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 CREDITS.md "$pkgdir/usr/share/licenses/$pkgname/CREDITS.md"
+  install -Dm644 subprojects/udis86/LICENSE "$pkgdir/usr/share/licenses/$pkgname/udis86/LICENSE"
+  install -Dm644 subprojects/hyprland-protocols/LICENSE "$pkgdir/usr/share/licenses/$pkgname/hyprland-protocols/LICENSE"
+}

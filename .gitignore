@@ -42,6 +42,7 @@ perf.data
 flame.svg
 
 PKGBUILD
+!packaging/aur/PKGBUILD
 
 src/version.h
 hyprpm/Makefile
