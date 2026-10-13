@@ -69,10 +69,11 @@ std::string SystemInfo::getVersion(eHyprCtlOutputFormat fmt) {
     std::ranges::replace(commitMsg, '#', ' ');
 
     if (fmt == eHyprCtlOutputFormat::FORMAT_NORMAL) {
-        std::string result = std::format("hyprland-plus {} built from branch {} at commit {} {} ({}).\n"
+        // The base version is named too: scripts and hyprtester look for "Hyprland" in this line.
+        std::string result = std::format("hyprland-plus {} (Hyprland {}) built from branch {} at commit {} {} ({}).\n"
                                          "Date: {}\n"
                                          "Tag: {}, commits: {}\n",
-                                         HYPRLAND_PLUS_VERSION, GIT_BRANCH, GIT_COMMIT_HASH, GIT_DIRTY, commitMsg, GIT_COMMIT_DATE, GIT_TAG, GIT_COMMITS);
+                                         HYPRLAND_PLUS_VERSION, HYPRLAND_VERSION, GIT_BRANCH, GIT_COMMIT_HASH, GIT_DIRTY, commitMsg, GIT_COMMIT_DATE, GIT_TAG, GIT_COMMITS);
 
         result += "\n";
         result += getBuiltSystemLibraryNames();

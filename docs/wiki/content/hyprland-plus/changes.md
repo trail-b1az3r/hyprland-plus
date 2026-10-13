@@ -12,7 +12,7 @@ hyprland-plus is Hyprland 0.56.2 (upstream tag `v0.56.2`) with the changes below
 | Dragging a tiled window that floats | Centres it on the cursor | Keeps the grab point. Set `binds:drag_keep_grab_point = false` to get the old behaviour. |
 | Tile under the cursor during a drag | Nothing | Tinted, showing the swap target. Off with `binds:drag_guide = false`. |
 | `SUPER + ALT + F` | Fullscreen | Still fullscreen. Fit to Neighbors is on `SUPER + CTRL + F` in the Halcyon dotfiles. |
-| `hyprland --version` | `hyprland 0.56.2` | `hyprland-plus 0.56.2.p1`, from the `PLUS_VERSION` file |
+| `hyprland --version` | `Hyprland 0.56.2` | `hyprland-plus 0.56.2.p1 (Hyprland 0.56.2)`, from the `PLUS_VERSION` file |
 
 ## New in hyprland-plus
 
