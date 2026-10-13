@@ -15,6 +15,8 @@
 #include "../../../desktop/rule/windowRule/WindowRule.hpp"
 #include "config/shared/actions/ConfigActions.hpp"
 #include "layout/LayoutManager.hpp"
+#include "plus/PlusTiles.hpp"
+#include "desktop/state/FocusState.hpp"
 
 using namespace Config;
 using namespace Config::Lua;
@@ -1086,6 +1088,197 @@ static int hlWindowResizeEdge(lua_State* L) {
     return 1;
 }
 
+// --- Plus Tiles (src/plus/PlusTiles.hpp) -------------------------------------------------------------------------
+
+static int plusResult(lua_State* L, const Plus::Result& r) {
+    if (!r)
+        return Internal::checkResult(L, CA::actionError(r.error(), CA::eActionErrorLevel::WARNING, CA::eActionErrorCode::INVALID_STATE));
+    return Internal::checkResult(L, CA::ActionResult{});
+}
+
+// The window named in the table, or the focused one.
+static PHLWINDOW plusWindow(lua_State* L, int upvalue) {
+    const auto W = Internal::windowFromUpval(L, upvalue);
+    if (W && *W)
+        return *W;
+    return Desktop::focusState()->window();
+}
+
+// A string argument, or a field of a table argument: select_edge("left") and select_edge({ edge = "left" }).
+static std::optional<std::string> plusStrArg(lua_State* L, const char* field) {
+    if (lua_type(L, 1) == LUA_TSTRING)
+        return std::string(lua_tostring(L, 1));
+    if (lua_istable(L, 1))
+        return Internal::tableOptStr(L, 1, field);
+    return std::nullopt;
+}
+
+static int dsp_plusEdit(lua_State* L) {
+    const std::string ACTION = lua_tostring(L, lua_upvalueindex(1));
+    const std::string EDGE   = lua_tostring(L, lua_upvalueindex(2));
+    const auto        WINDOW = plusWindow(L, 3);
+    const auto&       PLUS   = Plus::tiles();
+
+    if (ACTION == "enter")
+        return plusResult(L, PLUS->beginEdit(WINDOW, Plus::edgeFromString(EDGE)));
+    if (ACTION == "commit" || ACTION == "exit")
+        return plusResult(L, PLUS->commitEdit());
+    if (ACTION == "cancel")
+        return plusResult(L, PLUS->cancelEdit());
+    // toggle
+    if (PLUS->editing())
+        return plusResult(L, PLUS->commitEdit());
+    return plusResult(L, PLUS->beginEdit(WINDOW, Plus::edgeFromString(EDGE)));
+}
+
+// hl.dsp.plus.edit({ action = "toggle" | "enter" | "commit" | "cancel", edge?, window? }): Move Edge. Entering starts
+// an edit session on a Plus Tile, and switches to plus:edit_submap if it is set and defined.
+static int hlPlusEdit(lua_State* L) {
+    std::string action = "toggle";
+    std::string edge;
+    if (lua_istable(L, 1)) {
+        action = Internal::tableOptStr(L, 1, "action").value_or("toggle");
+        edge   = Internal::tableOptStr(L, 1, "edge").value_or("");
+    }
+    if (action != "toggle" && action != "enter" && action != "commit" && action != "exit" && action != "cancel")
+        return Internal::configError(L, "hl.plus.edit: invalid action \"{}\" (expected toggle, enter, commit or cancel)", action);
+    if (!edge.empty() && !Plus::edgeFromString(edge))
+        return Internal::configError(L, "hl.plus.edit: invalid edge \"{}\" (expected left, right, top or bottom)", edge);
+
+    lua_pushstring(L, action.c_str());
+    lua_pushstring(L, edge.c_str());
+    Internal::pushWindowUpval(L, 1);
+    lua_pushcclosure(L, dsp_plusEdit, 3);
+    return 1;
+}
+
+static int dsp_plusCommit(lua_State* L) {
+    return plusResult(L, Plus::tiles()->commitEdit());
+}
+
+static int hlPlusCommit(lua_State* L) {
+    lua_pushcclosure(L, dsp_plusCommit, 0);
+    return 1;
+}
+
+static int dsp_plusCancel(lua_State* L) {
+    return plusResult(L, Plus::tiles()->cancelEdit());
+}
+
+static int hlPlusCancel(lua_State* L) {
+    lua_pushcclosure(L, dsp_plusCancel, 0);
+    return 1;
+}
+
+static int dsp_plusSelectEdge(lua_State* L) {
+    return plusResult(L, Plus::tiles()->selectEdge(sc<Plus::eEdge>(lua_tointeger(L, lua_upvalueindex(1)))));
+}
+
+// hl.dsp.plus.select_edge("left") or ({ edge = "left" }): the edge the next moves apply to.
+static int hlPlusSelectEdge(lua_State* L) {
+    const auto STR = plusStrArg(L, "edge");
+    if (!STR)
+        return Internal::configError(L, "hl.plus.select_edge: needs an edge (left, right, top or bottom)");
+    const auto EDGE = Plus::edgeFromString(*STR);
+    if (!EDGE)
+        return Internal::configError(L, "hl.plus.select_edge: invalid edge \"{}\" (expected left, right, top or bottom)", *STR);
+
+    lua_pushinteger(L, *EDGE);
+    lua_pushcclosure(L, dsp_plusSelectEdge, 1);
+    return 1;
+}
+
+static int dsp_plusMoveEdge(lua_State* L) {
+    const bool   HASAMOUNT = lua_toboolean(L, lua_upvalueindex(1));
+    const double AMOUNT    = lua_tonumber(L, lua_upvalueindex(2));
+    const double SIGN      = lua_tonumber(L, lua_upvalueindex(3));
+    const auto   STEP      = sc<Plus::eStep>(lua_tointeger(L, lua_upvalueindex(4)));
+    const double PX        = HASAMOUNT ? AMOUNT : SIGN * Plus::tiles()->stepPx(STEP);
+    return plusResult(L, Plus::tiles()->moveEdge(PX));
+}
+
+// hl.dsp.plus.move_edge({ amount = 40 }) or ({ direction = "out" | "in", step = "normal" | "fine" | "coarse" }):
+// moves the selected edge outwards (positive) or inwards, as a preview or at once (plus:edit_preview).
+static int hlPlusMoveEdge(lua_State* L) {
+    std::optional<double> amount;
+    std::string           direction = "out";
+    std::string           step      = "normal";
+    if (lua_isnumber(L, 1))
+        amount = lua_tonumber(L, 1);
+    else if (lua_istable(L, 1)) {
+        amount    = Internal::tableOptNum(L, 1, "amount");
+        direction = Internal::tableOptStr(L, 1, "direction").value_or("out");
+        step      = Internal::tableOptStr(L, 1, "step").value_or("normal");
+    }
+
+    if (direction != "out" && direction != "in")
+        return Internal::configError(L, "hl.plus.move_edge: invalid direction \"{}\" (expected out or in)", direction);
+    Plus::eStep stepKind = Plus::STEP_NORMAL;
+    if (step == "fine")
+        stepKind = Plus::STEP_FINE;
+    else if (step == "coarse")
+        stepKind = Plus::STEP_COARSE;
+    else if (step != "normal")
+        return Internal::configError(L, "hl.plus.move_edge: invalid step \"{}\" (expected normal, fine or coarse)", step);
+
+    lua_pushboolean(L, amount.has_value());
+    lua_pushnumber(L, amount.value_or(0));
+    lua_pushnumber(L, direction == "in" ? -1 : 1);
+    lua_pushinteger(L, stepKind);
+    lua_pushcclosure(L, dsp_plusMoveEdge, 4);
+    return 1;
+}
+
+static int dsp_plusFit(lua_State* L) {
+    return plusResult(L, Plus::tiles()->fit(plusWindow(L, 1)));
+}
+
+// hl.dsp.plus.fit({ window? }): Fit to Neighbors.
+static int hlPlusFit(lua_State* L) {
+    Internal::pushWindowUpval(L, 1);
+    lua_pushcclosure(L, dsp_plusFit, 1);
+    return 1;
+}
+
+static int dsp_plusReset(lua_State* L) {
+    return plusResult(L, Plus::tiles()->reset(plusWindow(L, 1)));
+}
+
+// hl.dsp.plus.reset({ window? }): back to an ordinary tile, at the size it had before its first edge move.
+static int hlPlusReset(lua_State* L) {
+    Internal::pushWindowUpval(L, 1);
+    lua_pushcclosure(L, dsp_plusReset, 1);
+    return 1;
+}
+
+static int dsp_plusFocus(lua_State* L) {
+    return plusResult(L, Plus::tiles()->focus(sc<Math::eDirection>(lua_tointeger(L, lua_upvalueindex(1)))));
+}
+
+// hl.dsp.plus.focus("left") or ({ direction = "left" }): focus the nearest tile that way, by real geometry.
+static int hlPlusFocus(lua_State* L) {
+    const auto STR = plusStrArg(L, "direction");
+    if (!STR)
+        return Internal::configError(L, "hl.plus.focus: needs a direction (left, right, up or down)");
+    const auto DIR = Internal::parseDirectionStr(*STR);
+    if (DIR == Math::DIRECTION_DEFAULT)
+        return Internal::configError(L, "hl.plus.focus: invalid direction \"{}\" (expected left, right, up or down)", *STR);
+
+    lua_pushinteger(L, DIR);
+    lua_pushcclosure(L, dsp_plusFocus, 1);
+    return 1;
+}
+
+static int dsp_plusInspect(lua_State* L) {
+    return plusResult(L, Plus::tiles()->toggleInspector());
+}
+
+// hl.dsp.plus.inspect(): toggles the geometry inspector.
+static int hlPlusInspect(lua_State* L) {
+    lua_pushcclosure(L, dsp_plusInspect, 0);
+    return 1;
+}
+
 static int hlWindowBringToTop(lua_State* L) {
     lua_pushcclosure(L, dsp_bringToTop, 0);
     return 1;
@@ -1448,6 +1641,18 @@ void Internal::registerDispatcherBindings(lua_State* L) {
         Internal::setFn(L, "resize_edge", hlWindowResizeEdge);
         Internal::setFn(L, "fit_plustile", hlWindowFitPlustile);
         lua_setfield(L, -2, "window");
+
+        lua_newtable(L);
+        Internal::setFn(L, "edit", hlPlusEdit);
+        Internal::setFn(L, "commit", hlPlusCommit);
+        Internal::setFn(L, "cancel", hlPlusCancel);
+        Internal::setFn(L, "select_edge", hlPlusSelectEdge);
+        Internal::setFn(L, "move_edge", hlPlusMoveEdge);
+        Internal::setFn(L, "fit", hlPlusFit);
+        Internal::setFn(L, "reset", hlPlusReset);
+        Internal::setFn(L, "focus", hlPlusFocus);
+        Internal::setFn(L, "inspect", hlPlusInspect);
+        lua_setfield(L, -2, "plus");
 
         lua_newtable(L);
         Internal::markDispatcherTable(L);

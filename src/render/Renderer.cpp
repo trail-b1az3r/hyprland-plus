@@ -44,6 +44,7 @@
 #include "pass/TexPassElement.hpp"
 #include "pass/ClearPassElement.hpp"
 #include "pass/RectPassElement.hpp"
+#include "../plus/PlusTiles.hpp"
 #include "pass/RendererHintsPassElement.hpp"
 #include "pass/SurfacePassElement.hpp"
 #include "../debug/log/Logger.hpp"
@@ -431,30 +432,6 @@ void IHyprRenderer::renderWorkspaceWindowsFullscreen(PHLMONITOR pMonitor, PHLWOR
         renderWindow(w, pMonitor, time, true, RENDER_PASS_ALL);
     }
     renderFadeouts(pMonitor, Desktop::FADEOUT_PLANE_WINDOW_OVER_FULLSCREEN, pWorkspace);
-}
-
-// While a tiled window is dragged, the tile under the cursor is tinted. That is the tile the dragged window swaps
-// with when it is dropped. Off with binds:drag_guide = false.
-static void renderDragGuide(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace) {
-    static auto PDRAGGUIDE = CConfigValue<Config::BOOL>("binds:drag_guide");
-    if (!*PDRAGGUIDE || pMonitor->m_activeWorkspace != pWorkspace)
-        return;
-
-    // A reference: dragController() returns a unique pointer, and copying it does not compile.
-    const auto& DRAG   = g_layoutManager->dragController();
-    const auto  TARGET = DRAG->target();
-    if (!TARGET || !TARGET->window() || TARGET->floating() || DRAG->mode() != MBIND_MOVE || !DRAG->dragThresholdReached())
-        return;
-
-    const auto HOVERED = Desktop::viewState()->hitTest().windowAt(g_pInputManager->getMouseCoordsInternal(),
-                                                                  Desktop::View::ALLOW_FLOATING | Desktop::View::RESERVED_EXTENTS | Desktop::View::INPUT_EXTENTS, TARGET->window());
-    if (!HOVERED || HOVERED == TARGET->window() || HOVERED->m_isFloating)
-        return;
-
-    CRectPassElement::SRectData data;
-    data.box   = HOVERED->geometricBox(Desktop::View::IGeometric::GEOMETRIC_CURRENT);
-    data.color = CHyprColor(1.F, 0.78F, 0.26F, 0.25F);
-    g_pHyprRenderer->m_renderPass.add(makeUnique<CRectPassElement>(data));
 }
 
 void IHyprRenderer::renderWorkspaceWindows(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace, const Time::steady_tp& time) {
@@ -1208,7 +1185,10 @@ void IHyprRenderer::renderAllClientsForWorkspace(PHLMONITOR pMonitor, PHLWORKSPA
     else
         renderWorkspaceWindows(pMonitor, pWorkspace, time);
 
-    renderDragGuide(pMonitor, pWorkspace);
+    // Plus: the drag guide, then previews, highlights and inspector outlines. Drawn after the windows, so they are
+    // above window content, and in this monitor's coordinates.
+    Plus::tiles()->renderDragGuide(pMonitor, pWorkspace);
+    Plus::tiles()->render(pMonitor, pWorkspace);
 
     // and then special
     if UNLIKELY (pMonitor->m_specialDim->value() != 0.F) {

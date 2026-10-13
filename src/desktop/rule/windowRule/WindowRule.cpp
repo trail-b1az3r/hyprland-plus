@@ -249,6 +249,7 @@ static std::expected<WindowRuleEffectValue, std::string> parseWindowRuleEffect(C
         case WINDOW_RULE_EFFECT_SYNC_FULLSCREEN:
         case WINDOW_RULE_EFFECT_SUPERPOSITION:
         case WINDOW_RULE_EFFECT_PLUSTILE:
+        case WINDOW_RULE_EFFECT_PLUS_LOCKED:
         case WINDOW_RULE_EFFECT_IMMEDIATE:
         case WINDOW_RULE_EFFECT_XRAY:
         case WINDOW_RULE_EFFECT_RENDER_UNFOCUSED:

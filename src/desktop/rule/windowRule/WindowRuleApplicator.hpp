@@ -110,8 +110,10 @@ namespace Desktop::Rule {
         DEFINE_PROP(bool, syncFullscreen, true, WINDOW_RULE_EFFECT_SYNC_FULLSCREEN)
         // A superposition window stays tiled, but is drawn above a fullscreen floating window instead of being hidden by it.
         DEFINE_PROP(bool, superposition, false, WINDOW_RULE_EFFECT_SUPERPOSITION)
-        // A plustile window can be resized from each of its four edges with hl.dsp.window.resize_edge.
+        // A Plus Tile behaves like any tiled window until Move Edge is used on it (see src/plus/PlusTiles.hpp).
         DEFINE_PROP(bool, plustile, false, WINDOW_RULE_EFFECT_PLUSTILE)
+        // A locked Plus Tile keeps its size: Fit to Neighbors and auto-restore resize other tiles around it.
+        DEFINE_PROP(bool, plusLocked, false, WINDOW_RULE_EFFECT_PLUS_LOCKED)
         DEFINE_PROP(bool, tearing, false, WINDOW_RULE_EFFECT_IMMEDIATE)
         DEFINE_PROP(bool, xray, false, WINDOW_RULE_EFFECT_XRAY)
         DEFINE_PROP(bool, renderUnfocused, false, WINDOW_RULE_EFFECT_RENDER_UNFOCUSED)

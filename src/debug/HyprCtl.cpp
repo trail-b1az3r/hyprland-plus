@@ -78,6 +78,7 @@ using namespace Hyprutils::OS;
 #include "../layout/algorithm/Algorithm.hpp"
 #include "../layout/algorithm/TiledAlgorithm.hpp"
 #include "../layout/supplementary/WorkspaceAlgoMatcher.hpp"
+#include "../plus/PlusTiles.hpp"
 
 using namespace Render::GL;
 
@@ -1462,6 +1463,30 @@ static std::string dispatchSeterror(eHyprCtlOutputFormat format, std::string req
     return "ok";
 }
 
+// hyprctl plus inspect [window]: the Plus geometry inspector for one window (the focused one by default).
+// hyprctl plus board: the same for every tile on the focused workspace.
+static std::string plusRequest(eHyprCtlOutputFormat format, std::string request) {
+    CVarList          vars(request, 0, ' ');
+    const bool        JSON = format == eHyprCtlOutputFormat::FORMAT_JSON;
+    const std::string SUB  = vars.size() > 1 ? vars[1] : "inspect";
+
+    if (SUB == "inspect") {
+        const PHLWINDOW W = vars.size() > 2 ? Desktop::viewState()->query().selector(vars[2]).runWindow() : Desktop::focusState()->window();
+        if (!W)
+            return JSON ? "{\"error\": \"window not found\"}" : "window not found";
+        return Plus::tiles()->inspect(W, JSON);
+    }
+
+    if (SUB == "board") {
+        const auto   W  = Desktop::focusState()->window();
+        const auto   M  = Desktop::focusState()->monitor();
+        PHLWORKSPACE ws = W ? W->m_workspace : (M ? M->m_activeWorkspace : nullptr);
+        return Plus::tiles()->boardInfo(ws, JSON);
+    }
+
+    return "usage: hyprctl plus inspect [window] | hyprctl plus board";
+}
+
 static std::string dispatchGetProp(eHyprCtlOutputFormat format, std::string request) {
     CVarList vars(request, 0, ' ');
 
@@ -2032,6 +2057,7 @@ CHyprCtl::CHyprCtl() {
     registerCommand(SHyprCtlCommand{"notify", false, dispatchNotify});
     registerCommand(SHyprCtlCommand{"dismissnotify", false, dispatchDismissNotify});
     registerCommand(SHyprCtlCommand{"getprop", false, dispatchGetProp});
+    registerCommand(SHyprCtlCommand{"plus", false, plusRequest});
     registerCommand(SHyprCtlCommand{"seterror", false, dispatchSeterror});
     registerCommand(SHyprCtlCommand{"switchxkblayout", false, switchXKBLayoutRequest});
     registerCommand(SHyprCtlCommand{"output", false, dispatchOutput});
