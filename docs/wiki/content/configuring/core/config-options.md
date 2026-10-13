@@ -851,6 +851,40 @@ Category: `binds`
 | mini_height | Height in pixels of a mini window. See [Mini windows](../../../hyprland-plus/mini-windows/) | int | `54` | [16 - 8192] |
 | mini_width | Width in pixels of a mini window. See [Mini windows](../../../hyprland-plus/mini-windows/) | int | `96` | [16 - 8192] |
 
+### Plus Tiles
+
+Category: `plus`. See [Plus Tiles](../../../hyprland-plus/plustile/).
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| all_tiled | Treat every tiled window as a Plus Tile. When disabled, only windows with the `plustile` rule are | bool | `false` | |
+| auto_restore | Restore the custom sizes of edge-modified tiles after windows open, close or move, and after monitor changes | bool | `true` | |
+| edit_preview | Preview edge moves and apply them on commit. When disabled, each move is applied at once | bool | `true` | |
+| edit_submap | Submap to switch to while editing edges. It must be defined. Empty: do not switch | str | `plus-edit` | |
+| enabled | Enable Plus Tiles: Move Edge, Fit to Neighbors, geometric navigation and the inspector | bool | `true` | |
+| focus_preview | Flash the window that `hl.dsp.plus.focus` moves to | bool | `false` | |
+| max_height | Largest height an edge move can give a tile. `0`: no limit | int | `0` | [0 - 16384] |
+| max_width | Largest width an edge move can give a tile. `0`: no limit | int | `0` | [0 - 16384] |
+| min_height | Smallest height edge moves can make a tile or its neighbours | int | `90` | [16 - 8192] |
+| min_width | Smallest width edge moves can make a tile or its neighbours | int | `120` | [16 - 8192] |
+| step | Edge move step, in pixels | int | `40` | [1 - 4000] |
+| step_coarse | Coarse edge move step, in pixels | int | `160` | [1 - 4000] |
+| step_fine | Fine edge move step, in pixels | int | `10` | [1 - 4000] |
+
+Category: `plus.feedback`: previews and highlights of Plus actions.
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| border_size | Outline width of previews and highlights | int | `3` | [0 - 20] |
+| duration | How long flashes stay, in milliseconds | int | `450` | [0 - 10000] |
+| edge_color | The tile being edited, and its selected edge | color | `0xccffc842` | |
+| enabled | Draw Plus previews and highlights | bool | `true` | |
+| failed_color | A move or restore that cannot be done | color | `0xccff5050` | |
+| fill_opacity | How strongly previews fill their area, from 0 (outline only) to 1 | float | `0.22` | [0 - 1] |
+| focus_color | The target of directional Plus focus | color | `0x8866ffcc` | |
+| inspect_color | Geometry inspector outlines | color | `0xccc38bff` | |
+| neighbor_color | The neighbours an edge move resizes | color | `0x8878a6ff` | |
+| placement_color | The tile a dragged window would swap with (`binds:drag_guide`) | color | `0x66ffc842` | |
+| rounding | Corner rounding of previews and highlights | int | `8` | [0 - 100] |
+
 ### Superposition
 
 Category: `superposition`

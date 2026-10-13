@@ -296,7 +296,13 @@ Flag list:
 
 ## hyprland-plus additions
 
-hyprland-plus adds the `dots`, `store` and `load` commands. They are top-level `hyprctl` commands, not dispatchers.
+hyprland-plus adds the `dots`, `store`, `load` and `plus` commands. They are top-level `hyprctl` commands, not dispatchers.
+
+### plus
+
+`hyprctl plus inspect [window]` prints the Plus Tiles inspector for a window (the focused one by default): its geometry,
+minimum and maximum size, custom size, neighbours on each edge, adjustable edges, state, pending moves and the last
+refusal. `hyprctl plus board` prints it for every tile on the workspace. Both take `-j`.
 
 ### dots
 

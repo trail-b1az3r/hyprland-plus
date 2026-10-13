@@ -281,6 +281,21 @@ These dispatchers exist only in hyprland-plus.
 - `hl.dsp.window.fit_plustile({ window = ... })` pushes each edge of a plustile window outwards until its neighbours can
   give no more. `window` defaults to the active window.
 
+### Plus Tiles
+
+See [Plus Tiles](../../../hyprland-plus/plustile/) for how the edit session works.
+
+| Dispatcher | Does |
+| --- | --- |
+| `hl.dsp.plus.edit({ action, edge?, window? })` | Move Edge. `action` is `"toggle"` (default), `"enter"`, `"commit"` or `"cancel"` |
+| `hl.dsp.plus.select_edge("left")` | Selects the edge the next moves apply to: `left`, `right`, `top`, `bottom` |
+| `hl.dsp.plus.move_edge({ direction = "out", step = "normal" })` | Moves the selected edge out or in by `plus:step` (`fine`, `coarse`), or by `{ amount = px }` |
+| `hl.dsp.plus.commit()`, `hl.dsp.plus.cancel()` | End the edit session, applying or dropping the preview |
+| `hl.dsp.plus.fit({ window? })` | Fit to Neighbors |
+| `hl.dsp.plus.reset({ window? })` | Back to an ordinary tile |
+| `hl.dsp.plus.focus("left")` | Focuses the nearest tile in a direction, by real geometry |
+| `hl.dsp.plus.inspect()` | Toggles the geometry inspector |
+
 ```lua
 hl.bind("SUPER + CTRL + N", hl.dsp.window.mini(), { description = "Window: Make mini, or bring back to full size" })
 hl.bind("SUPER + ALT + Right", hl.dsp.window.resize_edge({ edge = "right", amount = 40 }))

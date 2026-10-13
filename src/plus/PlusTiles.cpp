@@ -46,10 +46,10 @@ namespace {
     // The layout's resize delta that moves `edge` outwards by `px`.
     Vector2D deltaOf(eEdge edge, double px) {
         switch (edge) {
-            case EDGE_LEFT: return {-px, 0};
-            case EDGE_RIGHT: return {px, 0};
-            case EDGE_TOP: return {0, -px};
-            case EDGE_BOTTOM: return {0, px};
+            case EDGE_LEFT: return Vector2D(-px, 0.0);
+            case EDGE_RIGHT: return Vector2D(px, 0.0);
+            case EDGE_TOP: return Vector2D(0.0, -px);
+            case EDGE_BOTTOM: return Vector2D(0.0, px);
         }
         return {};
     }
