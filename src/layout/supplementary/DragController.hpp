@@ -25,11 +25,9 @@ namespace Layout::Supplementary {
         eMouseBindMode mode() const;
         bool           wasDraggingWindow() const;
         bool           dragThresholdReached() const;
-        // True when the dragged window was tiled: dragging floats it, so floating() no longer says so.
-        bool draggingTiled() const;
-        void resetDragThresholdReached();
-        bool draggingTiled() const;
-        bool exclusiveDeviceGrab() const;
+        void           resetDragThresholdReached();
+        bool           draggingTiled() const;
+        bool           exclusiveDeviceGrab() const;
 
         /*
             Called to try to pick up window for dragging.

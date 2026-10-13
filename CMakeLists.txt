@@ -135,13 +135,14 @@ set(GLES_VERSION "GLES3")
 find_package(OpenGL REQUIRED COMPONENTS ${GLES_VERSION})
 find_package(glslang CONFIG REQUIRED)
 
-# nixpkgs ships glaze 8. Its package version file is SameMajorVersion, which only compares against the lowest
-# version asked for, so a range like 7...<9 never matches it. Ask for any version and check it here instead.
-# The build only uses glz::read_json and glz::generic, which 7 and 8 both have.
+# glaze's package version file is SameMajorVersion, which only compares against the lowest version asked for, so a
+# version range never matches a newer major (nixpkgs ships 8, Arch 9). Ask for any version and check it here.
+# The build only uses glz::read_json and glz::generic, which every glaze from 7 on has.
+# A found but unusable glaze cannot fall back to FetchContent: find_package has already created glaze::glaze, and
+# the fetched copy would define it again. So that case stops with a message instead.
 find_package(glaze QUIET)
-if(glaze_FOUND AND (glaze_VERSION VERSION_LESS 7 OR glaze_VERSION VERSION_GREATER_EQUAL 9))
-  message(STATUS "glaze ${glaze_VERSION} found, but this build needs 7 or 8")
-  set(glaze_FOUND FALSE)
+if(glaze_FOUND AND glaze_VERSION VERSION_LESS 7)
+  message(FATAL_ERROR "glaze ${glaze_VERSION} is installed, but this build needs glaze 7 or newer. Update glaze, or uninstall it so the build fetches its own.")
 endif()
 if(NOT glaze_FOUND)
   set(GLAZE_VERSION v7.2.0)

@@ -4,6 +4,7 @@
 #include "../config/ConfigValue.hpp"
 #include "../config/shared/actions/ConfigActions.hpp"
 #include "../config/shared/complex/ComplexDataTypes.hpp"
+#include "../debug/log/Logger.hpp"
 #include "../desktop/Workspace.hpp"
 #include "../desktop/state/FocusState.hpp"
 #include "../desktop/state/ViewState.hpp"
@@ -734,8 +735,9 @@ Result CPlusTiles::restore(PHLWORKSPACE ws, PHLWINDOW priority, bool interactive
 
         for (const auto& step : PLAN.steps) {
             const auto W = windowById(ws, step.id);
-            const auto T = W ? W->layoutTarget() : nullptr;
-            if (T)
+            if (!W)
+                continue;
+            if (const auto T = W->layoutTarget())
                 g_layoutManager->resizeTarget(deltaOf(step.edge, step.delta), T, cornerOf(step.edge));
         }
     }
@@ -802,27 +804,36 @@ void CPlusTiles::runScheduledRestores() {
 Result CPlusTiles::focus(Math::eDirection direction) {
     static auto PPREVIEW = CConfigValue<Config::BOOL>("plus:focus_preview");
 
-    const auto  W = Desktop::focusState()->window();
-    if (!enabled() || !W || W->m_isFloating) {
-        const auto R = CA::moveFocus(direction);
-        return R ? Result{} : std::unexpected(R.error().message);
-    }
+    // The normal movefocus, as a Result.
+    auto fallback = [direction]() -> Result {
+        if (const auto R = CA::moveFocus(direction); !R)
+            return std::unexpected(R.error().message);
+        return {};
+    };
 
-    auto       B      = board(W->m_workspace);
-    const auto TARGET = B && B->tile(idOf(W)) ? B->neighborInDirection(idOf(W), edgeOfDirection(direction)) : std::nullopt;
-    const auto NEXT   = TARGET ? windowById(W->m_workspace, *TARGET) : nullptr;
+    const auto W = Desktop::focusState()->window();
+    if (!enabled() || !W || W->m_isFloating)
+        return fallback();
 
-    if (!NEXT) {
-        // No tile that way on this workspace: the normal movefocus handles monitors and floats.
-        const auto R = CA::moveFocus(direction);
-        return R ? Result{} : std::unexpected(R.error().message);
-    }
+    auto                    B = board(W->m_workspace);
+    std::optional<uint64_t> target;
+    if (B && B->tile(idOf(W)))
+        target = B->neighborInDirection(idOf(W), edgeOfDirection(direction));
+
+    PHLWINDOW next;
+    if (target)
+        next = windowById(W->m_workspace, *target);
+
+    // No tile that way on this workspace: the normal movefocus handles monitors and floats.
+    if (!next)
+        return fallback();
 
     if (*PPREVIEW)
-        flash(W->m_workspace, B->tile(*TARGET)->rect, FEEDBACK_FOCUS);
+        flash(W->m_workspace, B->tile(*target)->rect, FEEDBACK_FOCUS);
 
-    const auto R = CA::focus(NEXT);
-    return R ? Result{} : std::unexpected(R.error().message);
+    if (const auto R = CA::focus(next); !R)
+        return std::unexpected(R.error().message);
+    return {};
 }
 
 // --- Inspector --------------------------------------------------------------------------------------------------
@@ -1097,7 +1108,7 @@ void CPlusTiles::renderDragGuide(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace) {
     }
 
     if (*PBORDER > 0) {
-        for (const auto& side : outline(R, std::max(1.0, *PBORDER * pMonitor->m_scale))) {
+        for (const auto& side : outline(R, std::max(1.0, sc<double>(*PBORDER) * pMonitor->m_scale))) {
             CRectPassElement::SRectData o;
             o.box   = boxOf(side);
             o.color = opaque(*PCOLOR);
@@ -1176,9 +1187,9 @@ void CPlusTiles::render(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace) {
 
         if (f.edge) {
             CRectPassElement::SRectData bar;
-            bar.box   = boxOf(edgeBar(R, *f.edge, std::max(4.0, *PBORDER * 3.0 * pMonitor->m_scale)));
+            bar.box   = boxOf(edgeBar(R, *f.edge, std::max(4.0, sc<double>(*PBORDER) * 3.0 * pMonitor->m_scale)));
             bar.color = opaque(argb, ALPHA);
-            bar.round = sc<int>(std::max(2.0, *PBORDER * pMonitor->m_scale));
+            bar.round = sc<int>(std::max(2.0, sc<double>(*PBORDER) * pMonitor->m_scale));
             g_pHyprRenderer->m_renderPass.add(makeUnique<CRectPassElement>(bar));
         }
 

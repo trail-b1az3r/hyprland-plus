@@ -67,10 +67,6 @@ bool CDragStateController::dragThresholdReached() const {
     return m_dragThresholdReached;
 }
 
-bool CDragStateController::draggingTiled() const {
-    return m_draggingTiled;
-}
-
 void CDragStateController::resetDragThresholdReached() {
     m_dragThresholdReached = false;
 }

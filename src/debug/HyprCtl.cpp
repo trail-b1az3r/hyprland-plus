@@ -1478,9 +1478,13 @@ static std::string plusRequest(eHyprCtlOutputFormat format, std::string request)
     }
 
     if (SUB == "board") {
-        const auto   W  = Desktop::focusState()->window();
-        const auto   M  = Desktop::focusState()->monitor();
-        PHLWORKSPACE ws = W ? W->m_workspace : (M ? M->m_activeWorkspace : nullptr);
+        const auto   W = Desktop::focusState()->window();
+        const auto   M = Desktop::focusState()->monitor();
+        PHLWORKSPACE ws;
+        if (W)
+            ws = W->m_workspace;
+        else if (M)
+            ws = M->m_activeWorkspace;
         return Plus::tiles()->boardInfo(ws, JSON);
     }
 
