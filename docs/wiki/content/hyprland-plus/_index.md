@@ -16,7 +16,7 @@ directories and IPC, so existing configs and session files keep working. The add
 | Drag guide | [Drag](drag/) | The tile under the cursor is tinted while a tiled window is dragged. It is the tile the window swaps with. |
 | Mini windows | [Mini windows](mini-windows/) | A window shrinks to a small floating tile. A click brings it back. |
 | Superposition windows | [Superposition](superposition/) | A tiled window kept on a thin strip at one screen edge, drawn above fullscreen windows. |
-| Plustile windows | [Plustile](plustile/) | A tiled window that can be resized from each of its four edges, and fitted to its neighbours. |
+| Plus Tiles | [Plus Tiles](plustile/) | Ordinary tiles until Move Edge is used on them; then a custom size that the neighbours fit around. With an inspector and geometric navigation. |
 | `hyprctl dots`, `store`, `load` | [hyprctl](hyprctl/) | Installs dot sets, and saves and loads them as `.dhyprsave` files. |
 | Version string | [Changes](changes/) | `hyprland --version` reports `hyprland-plus 0.56.2.p1`. |
 
