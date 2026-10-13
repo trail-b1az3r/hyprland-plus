@@ -553,6 +553,32 @@ std::vector<SP<IValue>> Values::getConfigValues() {
         MS<Bool>("superposition:reserve", "If enabled, the strip comes out of the tiles' area and they make room for it. If disabled, the strip is drawn over the tiles.", false,
                  {.refresh = Supplementary::REFRESH_LAYOUTS}),
 
+        // Plus Tiles (src/plus/PlusTiles.hpp)
+        MS<Bool>("plus:enabled", "Enable Plus Tiles: Move Edge, Fit to Neighbors, geometric navigation and the inspector.", true),
+        MS<Bool>("plus:all_tiled", "Treat every tiled window as a Plus Tile. When disabled, only windows with the plustile rule are.", false),
+        MS<String>("plus:edit_submap", "Submap to switch to while editing edges (it must be defined in the config). Empty: do not switch.", "plus-edit"),
+        MS<Bool>("plus:edit_preview", "Show edge moves as a preview and apply them on commit. When disabled, each move is applied at once.", true),
+        MS<Int>("plus:step", "Edge move step in pixels.", 40, {.min = 1, .max = 4000}),
+        MS<Int>("plus:step_fine", "Fine edge move step in pixels.", 10, {.min = 1, .max = 4000}),
+        MS<Int>("plus:step_coarse", "Coarse edge move step in pixels.", 160, {.min = 1, .max = 4000}),
+        MS<Int>("plus:min_width", "Smallest width a Plus Tile or its neighbours can be made by edge moves, in pixels.", 120, {.min = 16, .max = 8192}),
+        MS<Int>("plus:min_height", "Smallest height a Plus Tile or its neighbours can be made by edge moves, in pixels.", 90, {.min = 16, .max = 8192}),
+        MS<Int>("plus:max_width", "Largest width an edge move can give a Plus Tile, in pixels. 0: no limit.", 0, {.min = 0, .max = 16384}),
+        MS<Int>("plus:max_height", "Largest height an edge move can give a Plus Tile, in pixels. 0: no limit.", 0, {.min = 0, .max = 16384}),
+        MS<Bool>("plus:auto_restore", "Restore the custom sizes of edge-modified tiles after windows open, close or move, and after monitor changes.", true),
+        MS<Bool>("plus:focus_preview", "Flash the window that directional Plus focus moves to.", false),
+        MS<Bool>("plus:feedback:enabled", "Draw Plus previews and highlights.", true),
+        MS<Color>("plus:feedback:placement_color", "Highlight of the tile a dragged window would swap with.", 0x66ffc842),
+        MS<Color>("plus:feedback:edge_color", "Preview of the tile whose edge is being moved, and of the selected edge.", 0xccffc842),
+        MS<Color>("plus:feedback:neighbor_color", "Preview of the neighbours an edge move resizes.", 0x8878a6ff),
+        MS<Color>("plus:feedback:failed_color", "Flash shown when a move or restore cannot be done.", 0xccff5050),
+        MS<Color>("plus:feedback:focus_color", "Flash on the window directional Plus focus moves to.", 0x8866ffcc),
+        MS<Color>("plus:feedback:inspect_color", "Outlines drawn by the geometry inspector.", 0xccc38bff),
+        MS<Int>("plus:feedback:border_size", "Outline width of previews and highlights, in pixels.", 3, {.min = 0, .max = 20}),
+        MS<Float>("plus:feedback:fill_opacity", "How strongly previews fill their area, from 0 (outline only) to 1.", 0.22, {.min = 0, .max = 1}),
+        MS<Int>("plus:feedback:duration", "How long flashes stay, in milliseconds.", 450, {.min = 0, .max = 10000}),
+        MS<Int>("plus:feedback:rounding", "Corner rounding of previews and highlights, in pixels.", 8, {.min = 0, .max = 100}),
+
         /*
          * xwayland:
          */

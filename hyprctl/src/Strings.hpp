@@ -53,6 +53,8 @@ commands:
                           when Hyprland's config is reloaded
     setprop ...         → Sets a window property
     getprop ...         → Gets a window property
+    plus inspect [win]  → Plus Tiles geometry inspector (hyprland-plus)
+    plus board          → The inspector for every tile on this workspace
     splash              → Get the current splash
     status              → Get internal status information
     switchxkblayout ... → Sets the xkb layout index for a keyboard

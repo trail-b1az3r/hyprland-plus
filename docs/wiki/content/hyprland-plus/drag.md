@@ -27,10 +27,15 @@ binds {
 
 ## The guide: `binds:drag_guide`
 
-While a tiled window is dragged, the tile under the cursor is tinted. That is the tile the dragged window swaps with
-when it is dropped.
+While a tiled window is dragged, the tile under the cursor is highlighted: filled with `plus:feedback:placement_color`
+and outlined with it at full strength. That is the tile the dragged window swaps with when it is dropped. The
+highlight is drawn above the windows, in the monitor's own coordinates (offset and scale), follows workspace
+animations, and goes away as soon as the drag ends or the cursor leaves the tile.
 
 - **Type:** boolean. **Default:** `true`.
+
+Earlier versions never showed it: a tiled window becomes floating as soon as it is dragged, and the guide was skipped
+for floating windows. It now checks whether the dragged window was tiled before the drag.
 
 ```lua
 hl.config({ binds = { drag_guide = false } })   -- turn the tint off
@@ -41,5 +46,6 @@ Not done yet: a half-tile guide that splits the tile on drop. Dropping still swa
 ## Source
 
 - `binds:drag_keep_grab_point` and `binds:drag_guide`: `src/config/values/ConfigValues.cpp`
+- The guide: `CPlusTiles::renderDragGuide` in `src/plus/PlusTiles.cpp`
 - `floatingGrab`: `src/layout/supplementary/DragController.cpp`
 - The guide: `renderDragGuide` in `src/render/Renderer.cpp`
