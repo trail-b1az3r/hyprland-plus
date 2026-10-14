@@ -18,15 +18,27 @@ sudo hyprctl-lite install full
 1. Clones hyprland-plus into `~/hyprland-plus` of the account that ran `sudo`, or updates that clone.
 2. Installs the build dependencies listed in `packaging/aur/PKGBUILD`.
 3. Builds hyprland-plus as that account, not as root.
-4. Moves the packaged `hyprland` aside, kept as `/usr/bin/hyprland.official`.
-5. Installs to `/usr/local`, and removes `hyprctl-lite`.
+4. Keeps a copy of the packaged `hyprland` binary, if there is one, as `/usr/bin/hyprland.official`. The package
+   itself stays installed, because other packages depend on it.
+5. Installs to `/usr/local`, where it runs before anything in `/usr/bin`.
+6. If nothing in pacman provides `hyprland` (you never installed the stock package), installs a small empty package,
+   `hyprland-plus-local`, that does. Packages that depend on Hyprland are then satisfied by the fork, and pacman never
+   pulls the stock `hyprland` in beside it. `sudo pacman -R hyprland-plus-local` takes it away.
+7. Removes `hyprctl-lite`.
 
 If a step fails, `hyprctl-lite` stays in `/usr/local/bin`, so you can run the second command again.
 
 The `curl` command runs a script from GitHub as root. Read it first if you prefer:
 `curl -fsSL <the same URL> | less`.
 
-Log out and back in, or restart Hyprland, to run the new build.
+Log out and back in to run the new build.
+
+{{< callout type="info" >}}
+hyprland-plus is not a separate command. It **is** Hyprland, built with the additions, and it takes the place of the
+`Hyprland` program: start it the way you always start Hyprland. To check what is running, use `hyprctl version`, which
+says `hyprland-plus` in its first line. With the Halcyon dotfiles, `halcyon hyprland` also tells you whether the build
+is new enough for Plus Tiles.
+{{< /callout >}}
 
 ## Build by hand
 
@@ -42,8 +54,8 @@ sudo make install   # installs to /usr/local
 The dependencies are the ones in `packaging/aur/PKGBUILD`, in its `depends` and `makedepends` lists. On Arch the
 `libeis-1.0` pkg-config name comes from the `libei` package.
 
-The build uses `glaze` for JSON. If the system copy is missing, CMake fetches glaze 7.2.0 at build time. Accepted
-versions are 7 and 8.
+The build uses `glaze` for JSON. If the system copy is missing, CMake fetches glaze 7.2.0 at build time. Any glaze from
+version 7 up is accepted (Arch ships 9).
 
 ## The AUR package
 
@@ -53,5 +65,6 @@ conflicts with `hyprland`. Run `namcap` and `makepkg -s` on Arch before publishi
 ## Halcyon
 
 The Halcyon dotfiles build and install hyprland-plus themselves, on a separate console, during `./setup install`. See the
-dots repository's README for that. If the `hyprland-plus` package is already installed from the AUR, the installer skips
-the build.
+[Halcyon docs](https://trail-b1az3r.github.io/dots/hyprland-plus.html) for that. The installer finds hyprland-plus however
+it was installed: the AUR package, or a build in `/usr/local` from `hyprctl-lite` or an earlier install. An up-to-date
+build is not built again.

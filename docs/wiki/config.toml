@@ -48,6 +48,12 @@ url        = "https://github.com/trail-b1az3r/hyprland-plus"
 weight     = 2
 
 [[menu.main]]
+identifier = "halcyon"
+name       = "Halcyon"
+url        = "https://trail-b1az3r.github.io/dots/"
+weight     = 3
+
+[[menu.main]]
 name   = "Search"
 weight = 5
 [menu.main.params]

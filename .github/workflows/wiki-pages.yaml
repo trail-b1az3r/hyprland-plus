@@ -1,0 +1,67 @@
+name: Wiki site
+
+# Builds docs/wiki (Hugo, with the Hextra theme as a Go module) into https://trail-b1az3r.github.io/hyprland-plus/
+# and publishes it with GitHub Pages. Every push that touches the wiki builds it; only the default branch publishes.
+# One-time setup: Settings > Pages > Build and deployment > Source: GitHub Actions.
+
+on:
+  push:
+    paths:
+      - "docs/wiki/**"
+      - ".github/workflows/wiki-pages.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wiki-pages-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HUGO_VERSION: "0.147.9"
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # enableGitInfo: each page's last-updated date comes from git
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: docs/wiki/go.mod
+          cache: false
+
+      - name: Install Hugo (extended)
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/hugo.tgz" \
+            "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_extended_${HUGO_VERSION}_linux-amd64.tar.gz"
+          tar -xzf "$RUNNER_TEMP/hugo.tgz" -C "$RUNNER_TEMP" hugo
+          "$RUNNER_TEMP/hugo" version
+
+      - name: Build the wiki
+        working-directory: docs/wiki
+        run: |
+          "$RUNNER_TEMP/hugo" --gc --minify --baseURL "https://trail-b1az3r.github.io/hyprland-plus/" -d "$GITHUB_WORKSPACE/_site"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    name: Publish
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
