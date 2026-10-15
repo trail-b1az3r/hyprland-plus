@@ -3,7 +3,7 @@
 # libeis-1.0 is provided by the libei package, so that is the name here. Run `namcap PKGBUILD` and
 # `makepkg -s` on Arch before publishing.
 pkgname=hyprland-plus
-pkgver=0.56.2.p1
+pkgver=0.56.2.p2
 pkgrel=1
 pkgdesc="Hyprland 0.56.2 with the Halcyon additions: mini windows, superposition windows, plustile windows and a drag fix"
 arch=('x86_64')

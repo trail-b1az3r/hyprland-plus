@@ -39,6 +39,31 @@ hl.config({ binds = { mini_width = 96, mini_height = 54 } })
 - Moving a mini window uses the normal move paths: SUPER and a drag, or any move dispatcher. The `general:snap`
   settings also snap a mini window to edges and to other windows while it is dragged.
 
+## All at once: `hl.dsp.plus.mini_all`
+
+```lua
+hl.dsp.plus.mini_all({ action = "toggle" | "enable" | "disable" })
+```
+
+Every window on the focused monitor's workspace becomes a mini window, and they line up along the bottom of the screen,
+left to right in the order they were on screen, wrapping upwards when a row is full. Run it again (or with
+`action = "disable"`) and they all come back to where they were. With `"toggle"`, the default, it brings them back only
+when every window there is already mini. Fullscreen windows are left alone.
+
+| Option | Default | Range |
+|---|---|---|
+| `plus:mini_all_gap` | `16` | 0 to 400 pixels, between the mini windows and from the screen edges |
+
+```lua
+hl.bind("SUPER + CTRL + SHIFT + N", hl.dsp.plus.mini_all(), { description = "Windows: All mini, or all back" })
+```
+
+## Tiling a mini window
+
+A mini window that is tiled (`hl.dsp.window.float({ action = "disable" })`, or a drag onto the tiles) stops being mini
+and takes the size the layout gives it. Before 0.56.2.p2 it stayed marked mini, so bringing it back to full size
+afterwards moved it to its old floating place, off its tile.
+
 ## Clicking
 
 A press and release on a mini window, without moving it, restores it. Moving it counts as a drag, so it doesn't restore.
@@ -55,7 +80,9 @@ mini>>5a3f1c2e0,1
 
 ## Source
 
-- `Actions::miniWindow` in `src/config/shared/actions/ConfigActions.cpp`
+- `Actions::miniWindow` and `Actions::miniAll` in `src/config/shared/actions/ConfigActions.cpp`
+- `miniRow` (where mini all puts the windows) in `src/plus/Motion.cpp`, tested in `tests/plus/Motion.cpp`
+- Tiling a mini window: `CLayoutManager::changeFloatingMode` in `src/layout/LayoutManager.cpp`
 - The click handling in `processMouseDownNormal` in `src/managers/input/InputManager.cpp`
 - `isMini` and `setMini` in `src/desktop/view/Window.hpp`
 - The Lua binding in `src/config/lua/bindings/LuaBindingsDispatchers.cpp`

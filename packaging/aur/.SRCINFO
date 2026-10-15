@@ -1,6 +1,6 @@
 pkgbase = hyprland-plus
 	pkgdesc = Hyprland 0.56.2 with the Halcyon additions: mini windows, superposition windows, plustile windows and a drag fix
-	pkgver = 0.56.2.p1
+	pkgver = 0.56.2.p2
 	pkgrel = 1
 	url = https://github.com/trail-b1az3r/hyprland-plus
 	arch = x86_64

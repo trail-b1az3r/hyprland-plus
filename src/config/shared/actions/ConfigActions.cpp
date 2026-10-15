@@ -32,6 +32,7 @@
 #include "../../../state/WorkspacePlacementController.hpp"
 #include "../../../state/WorkspaceState.hpp"
 #include "../../../plus/PlusTiles.hpp"
+#include "../../../plus/Motion.hpp"
 
 #include <numbers>
 #include <utility>
@@ -267,13 +268,67 @@ ActionResult Actions::miniWindow(eTogglableAction action, std::optional<PHLWINDO
         LAYOUTTARGET->setPositionGlobal(CBox{std::clamp(POS.x, MONBOX.x, MAXX), std::clamp(POS.y, MONBOX.y, MAXY), SIZE.x, SIZE.y});
     } else {
         window->setMini(false);
-        LAYOUTTARGET->setPositionGlobal(window->miniRestoreBox());
+        // A mini window that was tiled since has its place from the layout; its old floating box would offset it.
+        if (window->m_isFloating)
+            LAYOUTTARGET->setPositionGlobal(window->miniRestoreBox());
     }
 
     LAYOUTTARGET->warpPositionSize();
 
     g_pEventManager->postEvent(SHyprIPCEvent{.event = "mini", .data = std::format("{:x},{}", rc<uintptr_t>(window.get()), sc<int>(wantMini))});
     g_pHyprRenderer->damageWindow(window, true);
+
+    return {};
+}
+
+// Shrinks every window on the focused monitor's workspace to a mini window, lined up along the bottom of the screen;
+// or, when they all are already (or with TOGGLE_ACTION_DISABLE), brings them all back.
+ActionResult Actions::miniAll(eTogglableAction action) {
+    static auto PGAP = CConfigValue<Config::INTEGER>("plus:mini_all_gap");
+
+    const auto  PMONITOR   = Desktop::focusState()->monitor();
+    const auto  PWORKSPACE = PMONITOR ? (PMONITOR->m_activeSpecialWorkspace ? PMONITOR->m_activeSpecialWorkspace : PMONITOR->m_activeWorkspace) : nullptr;
+    if (!PWORKSPACE || !PWORKSPACE->m_space)
+        return actionError("No workspace to act on", eActionErrorLevel::WARNING, eActionErrorCode::INVALID_STATE);
+
+    std::vector<PHLWINDOW> windows;
+    bool                   anyFull = false;
+    for (const auto& wt : PWORKSPACE->m_space->targets()) {
+        const auto T = wt.lock();
+        const auto W = T ? T->window() : nullptr;
+        if (!W || !W->m_isMapped || W->isHidden() || Fullscreen::controller()->isFullscreen(W))
+            continue;
+        windows.push_back(W);
+        anyFull = anyFull || !W->isMini();
+    }
+
+    const bool             WANTMINI = action == TOGGLE_ACTION_ENABLE || (action == TOGGLE_ACTION_TOGGLE && anyFull);
+
+    std::vector<PHLWINDOW> changed;
+    for (const auto& W : windows) {
+        if (W->isMini() == WANTMINI)
+            continue;
+        if (miniWindow(WANTMINI ? TOGGLE_ACTION_ENABLE : TOGGLE_ACTION_DISABLE, W))
+            changed.push_back(W);
+    }
+
+    if (!WANTMINI || changed.empty())
+        return {};
+
+    // Line the new mini windows up along the bottom, left to right in the order they were on screen.
+    static auto PMINIWIDTH  = CConfigValue<Config::INTEGER>("binds:mini_width");
+    static auto PMINIHEIGHT = CConfigValue<Config::INTEGER>("binds:mini_height");
+    std::ranges::stable_sort(changed, [](const PHLWINDOW& a, const PHLWINDOW& b) { return a->miniRestoreBox().x < b->miniRestoreBox().x; });
+
+    const CBox AREA  = PMONITOR->logicalBoxMinusReserved();
+    const auto BOXES = Plus::miniRow({.x = AREA.x, .y = AREA.y, .w = AREA.width, .h = AREA.height}, *PMINIWIDTH, *PMINIHEIGHT, *PGAP, changed.size());
+    for (size_t i = 0; i < changed.size() && i < BOXES.size(); ++i) {
+        const auto TARGET = changed[i]->layoutTarget();
+        if (!TARGET)
+            continue;
+        TARGET->setPositionGlobal(CBox{BOXES[i].x, BOXES[i].y, BOXES[i].w, BOXES[i].h});
+        TARGET->warpPositionSize();
+    }
 
     return {};
 }
@@ -934,6 +989,8 @@ ActionResult Actions::setProp(const std::string& PROP, const std::string& VAL, s
             parsePropTrivial(PWINDOW->m_ruleApplicator->persistentSize(), VAL);
         else if (PROP == "stay_focused")
             parsePropTrivial(PWINDOW->m_ruleApplicator->stayFocused(), VAL);
+        else if (PROP == "hold_focus")
+            parsePropTrivial(PWINDOW->m_ruleApplicator->holdFocus(), VAL);
         else if (PROP == "idle_inhibit")
             parsePropTrivial(PWINDOW->m_ruleApplicator->idleInhibitMode(), VAL);
         else if (PROP == "border_size")

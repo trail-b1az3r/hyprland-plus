@@ -16,6 +16,7 @@
 #include "config/shared/actions/ConfigActions.hpp"
 #include "layout/LayoutManager.hpp"
 #include "plus/PlusTiles.hpp"
+#include "plus/Desk.hpp"
 #include "desktop/state/FocusState.hpp"
 
 using namespace Config;
@@ -1279,6 +1280,47 @@ static int hlPlusInspect(lua_State* L) {
     return 1;
 }
 
+static int dsp_plusPeek(lua_State* L) {
+    const auto          ACTION = sc<CA::eTogglableAction>(sc<int>(lua_tonumber(L, lua_upvalueindex(1))));
+    std::optional<bool> on;
+    if (ACTION == CA::TOGGLE_ACTION_ENABLE)
+        on = true;
+    else if (ACTION == CA::TOGGLE_ACTION_DISABLE)
+        on = false;
+    return plusResult(L, Plus::desk()->peek(Desktop::focusState()->monitor(), on));
+}
+
+// hl.dsp.plus.peek({ action? }): desktop peek on the focused monitor. The windows fade almost away and the pointer
+// goes through them to the wallpaper and its widgets; run it again, or change workspace, to bring them back.
+static int hlPlusPeek(lua_State* L) {
+    lua_pushnumber(L, sc<int>(Internal::tableToggleAction(L, 1)));
+    lua_pushcclosure(L, dsp_plusPeek, 1);
+    return 1;
+}
+
+static int dsp_plusLocatePointer(lua_State* L) {
+    Plus::desk()->locatePointer();
+    return Internal::checkResult(L, CA::ActionResult{});
+}
+
+// hl.dsp.plus.locate_pointer(): draws a ring that closes in on the pointer.
+static int hlPlusLocatePointer(lua_State* L) {
+    lua_pushcclosure(L, dsp_plusLocatePointer, 0);
+    return 1;
+}
+
+static int dsp_plusMiniAll(lua_State* L) {
+    return Internal::checkResult(L, CA::miniAll(sc<CA::eTogglableAction>(sc<int>(lua_tonumber(L, lua_upvalueindex(1))))));
+}
+
+// hl.dsp.plus.mini_all({ action? }): every window on the focused workspace becomes a mini window, lined up along the
+// bottom of the screen; when they all are already, they all come back.
+static int hlPlusMiniAll(lua_State* L) {
+    lua_pushnumber(L, sc<int>(Internal::tableToggleAction(L, 1)));
+    lua_pushcclosure(L, dsp_plusMiniAll, 1);
+    return 1;
+}
+
 static int hlWindowBringToTop(lua_State* L) {
     lua_pushcclosure(L, dsp_bringToTop, 0);
     return 1;
@@ -1652,6 +1694,9 @@ void Internal::registerDispatcherBindings(lua_State* L) {
         Internal::setFn(L, "reset", hlPlusReset);
         Internal::setFn(L, "focus", hlPlusFocus);
         Internal::setFn(L, "inspect", hlPlusInspect);
+        Internal::setFn(L, "peek", hlPlusPeek);
+        Internal::setFn(L, "locate_pointer", hlPlusLocatePointer);
+        Internal::setFn(L, "mini_all", hlPlusMiniAll);
         lua_setfield(L, -2, "plus");
 
         lua_newtable(L);

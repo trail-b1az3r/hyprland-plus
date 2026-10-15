@@ -655,6 +655,12 @@ static int runDotsCommand(int argc, char** argv) {
 // The switches (a dot set install, or a load) record their result in the history. "load -a" loads the save before the
 // latest one, so running it again goes back.
 
+// The top-level entries of ~/.config that the Halcyon dots install (their dots/.config), and the shell's settings.
+#define HALCYON_CONFIG_ENTRIES                                                                                                                                                     \
+    "Kvantum chrome-flags.conf code-flags.conf darklyrc dolphinrc fastfetch fish fontconfig foot fuzzel hypr "                                                                     \
+    "kde-material-you-colors kdeglobals kitty konsolerc matugen mpv quickshell starship.toml systemd thorium-flags.conf "                                                          \
+    "wlogout xdg-desktop-portal zshrc.d illogical-impulse"
+
 // Sets ENTRIES to the top-level entries of ~/.config that any dot set installs.
 static std::string dotEntriesScript() {
     std::string s = "ENTRIES=$( {\n"
@@ -662,6 +668,9 @@ static std::string dotEntriesScript() {
     for (const auto& set : DOT_SETS)
         s += "  find \"$HOME/.local/share/halcyon/dotsets/" + std::string(set.name) + "/" + std::string(set.configDir) +
             "\" -mindepth 1 -maxdepth 1 -printf '%f\\n' 2>/dev/null || true\n";
+    // Always: what Halcyon installs into ~/.config, in case the repository isn't recorded or has moved, and the
+    // shell's own settings (illogical-impulse), which no set installs but every desktop here writes.
+    s += "  printf '%s\\n' " HALCYON_CONFIG_ENTRIES "\n";
     s += "} | sort -u )\n";
     return s;
 }
@@ -682,16 +691,22 @@ static std::string storeScript(const SSaveEnv& env, const std::string& name) {
     s += "trap 'rm -rf \"$STAGE\" \"$REFS\"' EXIT\n";
     s += "mkdir -p \"$STAGE/.config\" \"$STAGE/.local\"\n";
     // The dot files, as they are now.
+    // -H: an entry that is a link (into a clone, say) is saved as the files it points to, not as the link, which
+    // would leave nothing to load on another computer or after the clone is gone. Links inside it stay links.
     s += "printf '%s\\n' \"$ENTRIES\" | while IFS= read -r n; do\n"
-         "  if [ -n \"$n\" ] && [ -e \"$HOME/.config/$n\" ]; then cp -a \"$HOME/.config/$n\" \"$STAGE/.config/\"; fi\n"
+         "  if [ -n \"$n\" ] && [ -e \"$HOME/.config/$n\" ]; then cp -aH \"$HOME/.config/$n\" \"$STAGE/.config/\"; fi\n"
          "done\n";
     // The .local files the config refers to, and the ones that are always used with it.
     s += "grep -rhoaE '\\.local/[A-Za-z0-9_./-]+' \"$STAGE/.config\" 2>/dev/null | sed 's|[./]*$||' | sort -u > \"$REFS\" || true\n";
     s += "(cd \"$HOME\" && find .local/share/fonts -mindepth 1 -maxdepth 1 -name 'illogical-impulse-*' 2>/dev/null) >> \"$REFS\" || true\n";
-    s += "printf '%s\\n' .local/state/halcyon/theme.lua .local/state/halcyon/placement.lua >> \"$REFS\"\n";
+    // Halcyon's settings outside ~/.config: the theme, placement, Plus Tiles and games choices (*.lua), the active
+    // theme, and the shell's own notes, to-dos, calendar events and generated colours.
+    s += "(cd \"$HOME\" && find .local/state/halcyon -maxdepth 1 \\( -name '*.lua' -o -name active \\) 2>/dev/null) >> \"$REFS\" || true\n";
+    s += "(cd \"$HOME\" && find .local/state/quickshell/user -type f 2>/dev/null) >> \"$REFS\" || true\n";
     s += "while IFS= read -r p; do\n"
          "  case \"$p\" in\n"
-         "    .local/bin/*|.local/share/fonts/*|.local/share/icons/*|.local/share/themes/*|.local/state/halcyon/theme.lua|.local/state/halcyon/placement.lua) ;;\n"
+         "    .local/bin/*|.local/share/fonts/*|.local/share/icons/*|.local/share/themes/*|.local/state/halcyon/*.lua|.local/state/halcyon/active|.local/state/quickshell/user/*) "
+         ";;\n"
          "    *) continue ;;\n"
          "  esac\n"
          "  if [ -e \"$HOME/$p\" ] || [ -L \"$HOME/$p\" ]; then mkdir -p \"$STAGE/$(dirname \"$p\")\"; cp -a \"$HOME/$p\" \"$STAGE/$p\"; fi\n"
@@ -699,7 +714,11 @@ static std::string storeScript(const SSaveEnv& env, const std::string& name) {
     s += "{ echo 'dhyprsave 1'; echo \"created $(date '+%Y-%m-%d %H:%M')\"; echo 'config:'; ls -1 \"$STAGE/.config\"; "
          "echo 'local:'; (cd \"$STAGE\" && find .local -type f -o -type l); } > \"$STAGE/manifest.txt\"\n";
     s += "tar -C \"$STAGE\" -czf \"$OUT\" .\n";
-    s += "echo \"Saved $NAME to $OUT\"\n";
+    s += "FILES=$(cd \"$STAGE\" && find . -type f -o -type l | wc -l)\n";
+    s += "echo \"Saved $NAME to $OUT: $FILES files, $(du -h \"$OUT\" | cut -f1) ($(ls -1 \"$STAGE/.config\" | wc -l) folders of ~/.config)\"\n";
+    // A save of a few files means the dots weren't found: say so rather than leave a save that restores nothing.
+    s += "if [ \"$FILES\" -lt 50 ]; then echo \"warning: only $FILES files. The Halcyon config wasn't found in ~/.config; see what was saved in the manifest: tar -xOzf $OUT "
+         "./manifest.txt\"; fi\n";
     return s;
 }
 
@@ -778,7 +797,7 @@ static int runShell(const std::string& script) {
 }
 
 static int saveUsage() {
-    std::println("usage: hyprctl store -n <name>        save the dot files as <name>.dhyprsave");
+    std::println("usage: hyprctl store -n <name>        save the dot files as <name>.dhyprsave (hyprctl save does the same)");
     std::println("       hyprctl load -l                list the saves");
     std::println("       hyprctl load -a                load the save before the latest switch");
     std::println("       hyprctl load -n <name>         load a save");
@@ -828,7 +847,7 @@ int main(int argc, char** argv) {
 
     if (std::string_view{argv[1]} == "dots")
         return runDotsCommand(argc, argv);
-    if (std::string_view{argv[1]} == "store")
+    if (std::string_view{argv[1]} == "store" || std::string_view{argv[1]} == "save")
         return runStore(argc, argv);
     if (std::string_view{argv[1]} == "load")
         return runLoad(argc, argv);

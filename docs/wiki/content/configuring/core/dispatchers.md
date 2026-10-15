@@ -296,6 +296,16 @@ See [Plus Tiles](../../../hyprland-plus/plustile/) for how the edit session work
 | `hl.dsp.plus.focus("left")` | Focuses the nearest tile in a direction, by real geometry |
 | `hl.dsp.plus.inspect()` | Toggles the geometry inspector |
 
+### Desk and mini all
+
+See [Desk](../../../hyprland-plus/desk/) and [Mini windows](../../../hyprland-plus/mini-windows/).
+
+| Dispatcher | Does |
+| --- | --- |
+| `hl.dsp.plus.peek({ action? })` | Desktop peek on the focused monitor: windows fade and the pointer goes through them. `action` is `"toggle"` (default), `"enable"` or `"disable"` |
+| `hl.dsp.plus.locate_pointer()` | Draws a ring that closes in on the pointer |
+| `hl.dsp.plus.mini_all({ action? })` | Every window on the focused workspace becomes mini, in a row along the bottom; or they all come back |
+
 ```lua
 hl.bind("SUPER + CTRL + N", hl.dsp.window.mini(), { description = "Window: Make mini, or bring back to full size" })
 hl.bind("SUPER + ALT + Right", hl.dsp.window.resize_edge({ edge = "right", amount = 40 }))
