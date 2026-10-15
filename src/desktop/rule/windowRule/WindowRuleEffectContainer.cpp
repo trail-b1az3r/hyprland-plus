@@ -60,6 +60,7 @@ static const std::vector<std::string> EFFECT_STRINGS = {
     "superposition",          //
     "plustile",               //
     "plus_locked",            //
+    "hold_focus",             //
     "immediate",              //
     "xray",                   //
     "render_unfocused",       //
@@ -76,7 +77,7 @@ static const std::vector<std::string> EFFECT_STRINGS = {
 
 // This is here so that if we change the rules, we get reminded to update
 // the strings.
-static_assert(WINDOW_RULE_EFFECT_LAST_STATIC == 61); // superposition, plustile and plus_locked were added after sync_fullscreen
+static_assert(WINDOW_RULE_EFFECT_LAST_STATIC == 62); // superposition, plustile, plus_locked and hold_focus were added after sync_fullscreen
 
 CWindowRuleEffectContainer::CWindowRuleEffectContainer() : IEffectContainer<eWindowRuleEffect>(std::vector<std::string>{EFFECT_STRINGS}) {
     ;

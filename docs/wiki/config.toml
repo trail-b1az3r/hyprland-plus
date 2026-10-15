@@ -80,7 +80,7 @@ dateFormat         = "January 2, 2006"
 keywords           = ["hyprland", "hyprland-plus", "halcyon", "wiki"]
 
 [params.version]
-name       = "hyprland-plus 0.56.2.p1"
+name       = "hyprland-plus 0.56.2.p2"
 url        = "/version-selector/"
 outdated   = false  # set for any version that isn't the current one
 version    = ""     # only change when setting the version, otherwise it is "Latest git" by default

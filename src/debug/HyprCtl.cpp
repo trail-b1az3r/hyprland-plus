@@ -1659,6 +1659,8 @@ static std::string dispatchGetProp(eHyprCtlOutputFormat format, std::string requ
         return windowPropToString(PWINDOW->m_ruleApplicator->persistentSize());
     else if (PROP == "stay_focused")
         return windowPropToString(PWINDOW->m_ruleApplicator->stayFocused());
+    else if (PROP == "hold_focus")
+        return windowPropToString(PWINDOW->m_ruleApplicator->holdFocus());
     else if (PROP == "idle_inhibit")
         return windowPropToString(PWINDOW->m_ruleApplicator->idleInhibitMode());
     else if (PROP == "border_size")

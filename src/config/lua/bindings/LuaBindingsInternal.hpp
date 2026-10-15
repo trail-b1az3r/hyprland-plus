@@ -98,6 +98,7 @@ namespace Config::Lua::Bindings::Internal {
         {"superposition", []() -> ILuaConfigValue* { return new CLuaConfigBool(false); }, WE::WINDOW_RULE_EFFECT_SUPERPOSITION},
         {"plustile", []() -> ILuaConfigValue* { return new CLuaConfigBool(false); }, WE::WINDOW_RULE_EFFECT_PLUSTILE},
         {"plus_locked", []() -> ILuaConfigValue* { return new CLuaConfigBool(false); }, WE::WINDOW_RULE_EFFECT_PLUS_LOCKED},
+        {"hold_focus", []() -> ILuaConfigValue* { return new CLuaConfigBool(false); }, WE::WINDOW_RULE_EFFECT_HOLD_FOCUS},
         {"immediate", []() -> ILuaConfigValue* { return new CLuaConfigBool(false); }, WE::WINDOW_RULE_EFFECT_IMMEDIATE},
         {"xray", []() -> ILuaConfigValue* { return new CLuaConfigBool(false); }, WE::WINDOW_RULE_EFFECT_XRAY},
         {"render_unfocused", []() -> ILuaConfigValue* { return new CLuaConfigBool(false); }, WE::WINDOW_RULE_EFFECT_RENDER_UNFOCUSED},

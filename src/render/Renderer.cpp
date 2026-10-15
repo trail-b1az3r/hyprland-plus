@@ -45,6 +45,7 @@
 #include "pass/ClearPassElement.hpp"
 #include "pass/RectPassElement.hpp"
 #include "../plus/PlusTiles.hpp"
+#include "../plus/Desk.hpp"
 #include "pass/RendererHintsPassElement.hpp"
 #include "pass/SurfacePassElement.hpp"
 #include "../debug/log/Logger.hpp"
@@ -595,6 +596,9 @@ void IHyprRenderer::renderWindow(PHLWINDOW pWindow, PHLMONITOR pMonitor, const T
     renderdata.fadeAlpha = pWindow->alphaValue(WINDOW_ALPHA_FADE) * pWindow->alphaValue(WINDOW_ALPHA_FULLSCREEN) * pWindow->alphaValue(WINDOW_ALPHA_LAYOUT) *
         (pWindow->m_pinned || USE_WORKSPACE_FADE_ALPHA ? 1.f : PWORKSPACE->m_alpha->value()) *
         (USE_WORKSPACE_FADE_ALPHA ? pWindow->alphaValue(WINDOW_ALPHA_MOVE_TO_WORKSPACE) : 1.F) * pWindow->alphaValue(WINDOW_ALPHA_MOVE_FROM_WORKSPACE);
+    // hyprland-plus desktop peek (src/plus/Desk.hpp): 1 outside a peek.
+    const float PEEKOPACITY = standalone ? 1.F : Plus::desk()->windowOpacity(pMonitor);
+    renderdata.fadeAlpha *= PEEKOPACITY;
     renderdata.alpha         = pWindow->alphaValue(WINDOW_ALPHA_ACTIVE);
     renderdata.decorate      = decorate && !pWindow->m_X11DoesntWantBorders && Fullscreen::controller()->getFullscreenModes(pWindow).internal != Fullscreen::FSMODE_FULLSCREEN;
     renderdata.rounding      = standalone || renderdata.dontRound ? 0 : pWindow->rounding() * pMonitor->m_scale;
@@ -778,14 +782,14 @@ void IHyprRenderer::renderWindow(PHLWINDOW pWindow, PHLMONITOR pMonitor, const T
             renderdata.surfaceCounter = 0;
 
             pWindow->m_popupHead->breadthfirst(
-                [this, &renderdata](WP<Desktop::View::CPopup> popup, void* data) {
+                [this, &renderdata, PEEKOPACITY](WP<Desktop::View::CPopup> popup, void* data) {
                     if (!popup->aliveAndVisible())
                         return;
 
                     const auto     pos    = popup->coordsRelativeToParent();
                     const Vector2D oldPos = renderdata.pos;
                     renderdata.pos += pos;
-                    renderdata.fadeAlpha = popup->alpha()[POPUP_ALPHA_FADE]->value();
+                    renderdata.fadeAlpha = popup->alpha()[POPUP_ALPHA_FADE]->value() * PEEKOPACITY;
 
                     popup->wlSurface()->resource()->breadthfirst(
                         [this, &renderdata](SP<CWLSurfaceResource> s, const Vector2D& offset, void* data) {
@@ -2184,6 +2188,9 @@ void IHyprRenderer::renderMonitor(PHLMONITOR pMonitor, bool commit) {
 
             // render IME even above the lockscreen - allow the user to use it to potentially input stuff on it.
             renderIME(pMonitor, NOW, renderBox);
+
+            // hyprland-plus: the locate pointer ring, above everything but the cursor.
+            Plus::desk()->render(pMonitor);
 
             if (pMonitor == Desktop::focusState()->monitor()) {
                 Notification::overlay()->draw(pMonitor);

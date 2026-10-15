@@ -10,6 +10,7 @@
 #include "../state/WorkspaceState.hpp"
 #include "../desktop/state/FocusState.hpp"
 #include "../desktop/view/Group.hpp"
+#include "../desktop/view/Window.hpp"
 #include "../event/EventBus.hpp"
 
 using namespace Layout;
@@ -40,6 +41,12 @@ void CLayoutManager::changeFloatingMode(SP<ITarget> target) {
     }
 
     target->space()->toggleTargetFloating(target);
+
+    // hyprland-plus: a mini window that is tiled stops being mini, or it would keep taking clicks as one.
+    if (const auto W = target->window(); W && W->isMini() && !target->floating()) {
+        W->setMini(false);
+        g_pEventManager->postEvent(SHyprIPCEvent{.event = "mini", .data = std::format("{:x},0", rc<uintptr_t>(W.get()))});
+    }
 
     if (pastFsMode != Fullscreen::FSMODE_NONE)
         Fullscreen::controller()->setFullscreenMode(target->window(), pastFsMode);

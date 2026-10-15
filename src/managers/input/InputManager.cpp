@@ -56,6 +56,7 @@
 #include "../../render/Renderer.hpp"
 #include "trackpad/TrackpadGestures.hpp"
 #include "../../pointer/cursor/CursorShapeOverrideController.hpp"
+#include "../../plus/Desk.hpp"
 
 #include <aquamarine/input/Input.hpp>
 #include <hyprutils/string/VarList.hpp>
@@ -248,7 +249,10 @@ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, st
     static auto PRESIZEONBORDER       = CConfigValue<Config::INTEGER>("general:resize_on_border");
     static auto PRESIZECURSORICON     = CConfigValue<Config::INTEGER>("general:hover_icon_on_border");
 
-    const auto  FOLLOWMOUSE = *PFOLLOWONDND && PROTO::data->dndActive() ? 1 : *PFOLLOWMOUSE;
+    // hyprland-plus: a window that holds focus (src/plus/Desk.hpp) keeps the keyboard while the pointer is elsewhere,
+    // as if follow_mouse were 2 while it has focus. A click (refocus) still moves focus.
+    const bool HOLDFOCUS   = !refocus && *PFOLLOWMOUSE == 1 && Plus::desk()->holdsFocus(Desktop::focusState()->window());
+    const auto FOLLOWMOUSE = *PFOLLOWONDND && PROTO::data->dndActive() ? 1 : (HOLDFOCUS ? 2 : *PFOLLOWMOUSE);
 
     if (FOLLOWMOUSE == 1 && m_lastCursorMovement.getSeconds() < 0.5)
         m_mousePosDelta += MOUSECOORDSFLOORED.distance(m_lastCursorPosFloored);
@@ -272,12 +276,17 @@ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, st
 
     m_lastCursorPosFloored = MOUSECOORDSFLOORED;
 
+    Plus::desk()->onPointerMove(mouseCoords);
+
     // use mouseCoords specifically in case touch sent overridePos, otherwise touch doesn't work on non-focused monitor
     const auto PMONITOR = isLocked() && Desktop::focusState()->monitor() ? Desktop::focusState()->monitor() : State::monitorState()->query().vec(mouseCoords).run();
 
     // this can happen if there are no displays hooked up to Hyprland
     if (PMONITOR == nullptr)
         return;
+
+    // hyprland-plus desktop peek: the pointer goes through this monitor's windows, to the layers below them.
+    const bool PEEK = Plus::desk()->peeking(PMONITOR);
 
     if (PMONITOR->m_cursorZoom->value() != 1.f)
         g_pHyprRenderer->damageMonitor(PMONITOR);
@@ -496,7 +505,7 @@ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, st
         (Fullscreen::controller()->hasFullscreen(PWORKSPACE) && Fullscreen::controller()->getFullscreenModes(PWORKSPACE).internal == Fullscreen::FSMODE_FULLSCREEN) ||
         (Fullscreen::controller()->hasFullscreen(PMONITOR) && Fullscreen::controller()->getFullscreenModes(PMONITOR).internal == Fullscreen::FSMODE_FULLSCREEN);
 
-    if (HAS_EXCLUSIVE_FULLSCREEN) {
+    if (HAS_EXCLUSIVE_FULLSCREEN && !PEEK) {
         const auto IS_LS_UNFOCUSABLE = pFoundLayerSurface &&
             (pFoundLayerSurface->m_layer < ZWLR_LAYER_SHELL_V1_LAYER_TOP ||
              (pFoundLayerSurface->m_layer == ZWLR_LAYER_SHELL_V1_LAYER_TOP && !pFoundLayerSurface->m_aboveFullscreen));
@@ -528,7 +537,7 @@ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, st
     }
 
     // then windows
-    if (!foundSurface) {
+    if (!foundSurface && !PEEK) {
         if (Fullscreen::controller()->hasFullscreen(PWORKSPACE) && Fullscreen::controller()->getFullscreenModes(PWORKSPACE).internal == Fullscreen::FSMODE_MAXIMIZED) {
             if (!foundSurface) {
                 if (PMONITOR->m_activeSpecialWorkspace) {
@@ -680,7 +689,7 @@ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, st
             if (pFoundWindow != Desktop::focusState()->window() && Desktop::focusState()->window() &&
                 ((pFoundWindow->m_isFloating && *PFLOATBEHAVIOR == 2) || (Desktop::focusState()->window()->m_isFloating != pFoundWindow->m_isFloating && *PFLOATBEHAVIOR != 0))) {
                 // enter if change floating style
-                if (FOLLOWMOUSE != 3 && allowKeyboardRefocus)
+                if (FOLLOWMOUSE != 3 && allowKeyboardRefocus && !HOLDFOCUS)
                     Desktop::focusState()->rawWindowFocus(pFoundWindow, FOCUS_REASON, foundSurface);
                 g_pSeatManager->setPointerFocus(foundSurface, surfaceLocal);
             } else if (FOLLOWMOUSE == 2 || FOLLOWMOUSE == 3)
@@ -731,7 +740,7 @@ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, st
         }
 
         if (pFoundLayerSurface && (pFoundLayerSurface->m_layerSurface->m_current.interactivity != ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE) && FOLLOWMOUSE != 3 &&
-            (allowKeyboardRefocus || pFoundLayerSurface->m_layerSurface->m_current.interactivity == ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE)) {
+            ((allowKeyboardRefocus && !HOLDFOCUS) || pFoundLayerSurface->m_layerSurface->m_current.interactivity == ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE)) {
             Desktop::focusState()->rawSurfaceFocus(foundSurface);
         }
 

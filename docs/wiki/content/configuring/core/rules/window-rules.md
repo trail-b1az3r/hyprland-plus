@@ -317,13 +317,14 @@ myRule:is_enabled()        -- query status
 
 ## hyprland-plus additions
 
-hyprland-plus adds three effects. Like `float`, each is set to `true`.
+hyprland-plus adds four effects. Like `float`, each is set to `true`.
 
 | Effect | Does |
 | --- | --- |
 | `superposition` | Keeps the window tiled, but draws it on a strip at the edge of the screen, above a fullscreen floating window. See [Superposition windows](../../../../hyprland-plus/superposition/). |
 | `plustile` | Makes the window a Plus Tile: ordinary until Move Edge is used on it. See [Plus Tiles](../../../../hyprland-plus/plustile/). |
 | `plus_locked` | A Plus Tile that keeps its size: Fit to Neighbors and auto-restore resize the other tiles around it. |
+| `hold_focus` | The window keeps the keyboard when the pointer leaves it; a click still moves focus. For games. See [Desk](../../../../hyprland-plus/desk/). |
 
 ```lua
 hl.window_rule({ match = { class = "^([Ss]potify)$" }, superposition = true })

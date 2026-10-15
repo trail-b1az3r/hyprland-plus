@@ -160,9 +160,26 @@ hl.bind("SUPER + ALT + Right", hl.dsp.window.resize_edge({ edge = "right", amoun
 Source: `plustile` in `src/desktop/rule/windowRule/`, `resizeEdge` in `src/config/shared/actions/ConfigActions.cpp`,
 and `hl.dsp.window.resize_edge` in `src/config/lua/bindings/LuaBindingsDispatchers.cpp`.
 
+## New in 0.56.2.p2
+
+- **Hold focus, for games**: the `hold_focus` window rule, or `plus:game_hold_focus` for every window whose content type
+  is `game`. The window keeps the keyboard when the pointer leaves it, so a game doesn't pause when the pointer goes to
+  a second screen. A click still moves focus.
+- **Desktop peek**: `hl.dsp.plus.peek()` fades the windows on the focused monitor and lets the pointer through to the
+  wallpaper and its widgets. Run it again to bring them back.
+- **Locate pointer**: `hl.dsp.plus.locate_pointer()` draws a ring that closes in on the pointer. With
+  `plus:shake_to_find`, shaking the mouse does it.
+- **Mini all**: `hl.dsp.plus.mini_all()` makes every window on the workspace a mini window, in a row along the bottom
+  of the screen, and brings them all back the next time.
+- **Fixes**: a mini window that is tiled stops being mini, so bringing it back no longer moves it off its tile.
+  `hyprctl store` (now also `hyprctl save`) saves the files behind linked config folders instead of the links, and
+  includes Halcyon's state and the shell's settings. Before, a save could be about 10 KB.
+
+See [Desk](docs/wiki/content/hyprland-plus/desk.md) and [Mini windows](docs/wiki/content/hyprland-plus/mini-windows.md).
+
 ## Version string
 
-`hyprland --version` reports `hyprland-plus 0.56.2.p1`, from the `PLUS_VERSION` file. The fork is based on upstream
+`hyprland --version` reports `hyprland-plus 0.56.2.p2`, from the `PLUS_VERSION` file. The fork is based on upstream
 0.56.2, and `VERSION` keeps the numeric version that CMake needs. The binary and the config directory names are
 unchanged, so existing configs and session files keep working.
 

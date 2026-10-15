@@ -114,6 +114,8 @@ namespace Desktop::Rule {
         DEFINE_PROP(bool, plustile, false, WINDOW_RULE_EFFECT_PLUSTILE)
         // A locked Plus Tile keeps its size: Fit to Neighbors and auto-restore resize other tiles around it.
         DEFINE_PROP(bool, plusLocked, false, WINDOW_RULE_EFFECT_PLUS_LOCKED)
+        // A window that holds focus keeps the keyboard when the pointer leaves it; a click still moves focus (src/plus/Desk.hpp).
+        DEFINE_PROP(bool, holdFocus, false, WINDOW_RULE_EFFECT_HOLD_FOCUS)
         DEFINE_PROP(bool, tearing, false, WINDOW_RULE_EFFECT_IMMEDIATE)
         DEFINE_PROP(bool, xray, false, WINDOW_RULE_EFFECT_XRAY)
         DEFINE_PROP(bool, renderUnfocused, false, WINDOW_RULE_EFFECT_RENDER_UNFOCUSED)
