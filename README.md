@@ -50,6 +50,10 @@ sudo hyprctl-lite install full
 installs it to `/usr/local`. It removes itself when it's done. The packaged Hyprland is kept as
 `/usr/bin/hyprland.official`. The `curl` command runs a script from GitHub as root, so read it first if you prefer.
 
+To update an installed hyprland-plus, `sudo hyprctl-lite install update`. It builds only when the branch has new
+commits, lists them first, and keeps `hyprctl-lite` for the next update. `hyprctl-lite install update --check` only
+says whether one is waiting (no sudo).
+
 Other distributions: build it by hand with the same steps. The AUR package is described in `packaging/aur/`.
 
 For Hyprland's own documentation, see the [configuration guide](https://wiki.hypr.land/Configuring/). It applies here,
@@ -124,6 +128,8 @@ fullscreen floating window.
 - `superposition:size`: the strip's width or height, as a fraction of the screen (default 0.12).
 - `superposition:reserve`: `false` (default) draws the strip over the tiles. `true` takes the strip out of the
   tiles' area, so they make room for it.
+- `superposition:over_fullscreen`: `true` (default) keeps the strip above a fullscreen window. `false` gives the
+  fullscreen window the whole screen and hides the strip until it is not fullscreen.
 
 ```lua
 hl.config({ superposition = { edge = 1, size = 0.12, reserve = true } })
@@ -139,6 +145,12 @@ with when it is dropped. Default `true`; set it to `false` to turn it off. Sourc
 `src/render/Renderer.cpp`.
 
 Not done yet: a half-tile guide that splits the tile on drop. Dropping still swaps the tiles.
+
+## Fullscreen on drop: `binds:drag_fullscreen_edge`
+
+With a value above 0, a window dropped within that many pixels of the top of its monitor, after a move drag, becomes
+fullscreen. Default `0` (off). The drag must have started below the strip and moved at least 8 pixels. Source:
+`droppedAtTopEdge` in `src/layout/supplementary/DragController.cpp`.
 
 ## Plustile windows: `plustile` and `hl.dsp.window.resize_edge`
 

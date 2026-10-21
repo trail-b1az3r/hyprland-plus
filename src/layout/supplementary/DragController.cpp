@@ -87,6 +87,21 @@ static Vector2D floatingGrab(bool keepGrabPoint, const CBox& before, const Vecto
     return (mouse - before.pos()).clamp(Vector2D{0.F, 0.F}, size);
 }
 
+// Whether a move drag was dropped at the top edge of a monitor, which fullscreens the window (binds:drag_fullscreen_edge).
+// The drag must also have started below the edge zone and travelled, so a click or a window already up there is left alone.
+static bool droppedAtTopEdge(const Vector2D& begin, const Vector2D& drop) {
+    static auto PEDGE = CConfigValue<Config::INTEGER>("binds:drag_fullscreen_edge");
+    if (*PEDGE <= 0 || begin.distanceSq(drop) < 64.F)
+        return false;
+
+    const auto PMONITOR = State::monitorState()->query().vec(drop).run();
+    if (!PMONITOR)
+        return false;
+
+    const auto TOP = PMONITOR->m_position.y + *PEDGE;
+    return drop.y < TOP && begin.y >= TOP;
+}
+
 bool CDragStateController::updateDragWindow() {
     const auto  DRAGGINGTARGET = m_target.lock();
     const bool  WAS_FULLSCREEN = DRAGGINGTARGET->window() ? Fullscreen::controller()->isFullscreen(DRAGGINGTARGET->window()) : false;
@@ -308,6 +323,9 @@ void CDragStateController::dragEnd() {
     m_wasDraggingWindow = false;
     if (isResizeMode(m_dragMode))
         setXDGResizingState(draggingTarget, false);
+
+    if (m_dragMode == MBIND_MOVE && validMapped(draggingTarget->window()) && droppedAtTopEdge(m_beginDragXY, g_pInputManager->getMouseCoordsInternal()))
+        Fullscreen::controller()->setFullscreenMode(draggingTarget->window(), Fullscreen::FSMODE_FULLSCREEN);
 
     m_dragMode            = MBIND_INVALID;
     m_exclusiveDeviceGrab = false;

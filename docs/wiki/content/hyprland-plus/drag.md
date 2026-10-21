@@ -43,9 +43,25 @@ hl.config({ binds = { drag_guide = false } })   -- turn the tint off
 
 Not done yet: a half-tile guide that splits the tile on drop. Dropping still swaps the two tiles.
 
+## Dropping at the top: `binds:drag_fullscreen_edge`
+
+Drop a window at the top edge of the screen and it becomes fullscreen, as in most desktops' window management.
+
+- **Type:** integer, in pixels. **Default:** `0`, which is off.
+- When a move drag (`bindm` with `movewindow`) ends with the cursor within this many pixels of the top of the monitor
+  under it, the window is made fullscreen. A tiled window is tiled again first, so leaving fullscreen puts it back.
+- The drag must have started below that strip and moved at least 8 pixels, so a click, or a window that already
+  sits at the top of the screen, is not fullscreened by letting go of it.
+- Resize drags are not affected.
+
+```lua
+hl.config({ binds = { drag_fullscreen_edge = 8 } })
+```
+
 ## Source
 
-- `binds:drag_keep_grab_point` and `binds:drag_guide`: `src/config/values/ConfigValues.cpp`
+- `binds:drag_keep_grab_point`, `binds:drag_guide` and `binds:drag_fullscreen_edge`: `src/config/values/ConfigValues.cpp`
+- The drop: `droppedAtTopEdge` and `CDragStateController::dragEnd` in `src/layout/supplementary/DragController.cpp`
 - The guide: `CPlusTiles::renderDragGuide` in `src/plus/PlusTiles.cpp`
 - `floatingGrab`: `src/layout/supplementary/DragController.cpp`
 - The guide: `renderDragGuide` in `src/render/Renderer.cpp`
