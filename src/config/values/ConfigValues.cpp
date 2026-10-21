@@ -546,12 +546,20 @@ std::vector<SP<IValue>> Values::getConfigValues() {
         MS<Int>("binds:mini_width", "Width in pixels of a mini window (hl.dsp.window.mini).", 96, {.min = 16, .max = 8192}),
         MS<Int>("binds:mini_height", "Height in pixels of a mini window (hl.dsp.window.mini).", 54, {.min = 16, .max = 8192}),
         MS<Bool>("binds:drag_guide", "While a tiled window is dragged, tint the tile under the cursor: the tile it will swap with.", true),
+        MS<Int>("binds:drag_fullscreen_edge",
+                "If above 0, a window dropped with the cursor within this many pixels of the top of its monitor becomes fullscreen (move drags only, "
+                "and only once the cursor has moved from where the drag began). 0 turns it off.",
+                0, {.min = 0, .max = 512}),
         MS<Int>("superposition:edge", "Screen edge superposition windows tile to: 0 left, 1 right, 2 top, 3 bottom.", 1,
                 {.min = 0, .max = 3, .refresh = Supplementary::REFRESH_LAYOUTS}),
         MS<Float>("superposition:size", "Width (left/right) or height (top/bottom) of the superposition strip, as a fraction of the screen.", 0.12,
                   {.min = 0.02, .max = 0.5, .refresh = Supplementary::REFRESH_LAYOUTS}),
         MS<Bool>("superposition:reserve", "If enabled, the strip comes out of the tiles' area and they make room for it. If disabled, the strip is drawn over the tiles.", false,
                  {.refresh = Supplementary::REFRESH_LAYOUTS}),
+        MS<Bool>("superposition:over_fullscreen",
+                 "If enabled, superposition windows stay drawn above a fullscreen window, covering the strip's share of it. If disabled, a fullscreen window "
+                 "has the whole screen and they are hidden until it is not fullscreen.",
+                 true),
 
         // Plus Tiles (src/plus/PlusTiles.hpp)
         MS<Bool>("plus:enabled", "Enable Plus Tiles: Move Edge, Fit to Neighbors, geometric navigation and the inspector.", true),

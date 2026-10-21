@@ -949,11 +949,13 @@ bool CWindow::acceptsInput() const {
 }
 
 bool CWindow::isAllowedOverFullscreen() const {
+    static auto PSUPEROVERFS = CConfigValue<Config::BOOL>("superposition:over_fullscreen");
 
     if (!m_workspace)
         return false;
 
-    if (m_self == Fullscreen::controller()->getFullscreenWindow(m_workspace, true) || m_pinned || m_allowedOverFullscreen || m_ruleApplicator->superposition().valueOrDefault())
+    if (m_self == Fullscreen::controller()->getFullscreenWindow(m_workspace, true) || m_pinned || m_allowedOverFullscreen ||
+        (*PSUPEROVERFS && m_ruleApplicator->superposition().valueOrDefault()))
         return true;
 
     const auto FSWINDOW = Fullscreen::controller()->getFullscreenWindow(m_workspace);
