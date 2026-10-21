@@ -28,6 +28,19 @@ sudo hyprctl-lite install full
 
 If a step fails, `hyprctl-lite` stays in `/usr/local/bin`, so you can run the second command again.
 
+## Updating
+
+```sh
+hyprctl-lite install update --check   # exit 0: up to date, 10: an update is waiting, 1: not installed (no sudo)
+sudo hyprctl-lite install update
+```
+
+`install update` updates a hyprland-plus that is already installed in `/usr/local`. A hyprland-plus from the AUR is
+updated by your AUR helper instead. It pulls `~/hyprland-plus` and compares the commit the installed build came from
+with it: when they match, it stops without building. Otherwise it lists the new commits, installs only the build
+dependencies that are missing, builds and installs. Unlike `install full`, it keeps `hyprctl-lite`, so the next
+update is the same command. `--force` builds and installs again even when nothing changed.
+
 The `curl` command runs a script from GitHub as root. Read it first if you prefer:
 `curl -fsSL <the same URL> | less`.
 

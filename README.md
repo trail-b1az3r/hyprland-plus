@@ -50,6 +50,10 @@ sudo hyprctl-lite install full
 installs it to `/usr/local`. It removes itself when it's done. The packaged Hyprland is kept as
 `/usr/bin/hyprland.official`. The `curl` command runs a script from GitHub as root, so read it first if you prefer.
 
+To update an installed hyprland-plus, `sudo hyprctl-lite install update`. It builds only when the branch has new
+commits, lists them first, and keeps `hyprctl-lite` for the next update. `hyprctl-lite install update --check` only
+says whether one is waiting (no sudo).
+
 Other distributions: build it by hand with the same steps. The AUR package is described in `packaging/aur/`.
 
 For Hyprland's own documentation, see the [configuration guide](https://wiki.hypr.land/Configuring/). It applies here,
