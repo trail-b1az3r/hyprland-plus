@@ -18,11 +18,13 @@ hyprland-plus is Hyprland 0.56.2 (upstream tag `v0.56.2`) with the changes below
 
 - **Mini windows**: `hl.dsp.window.mini`, `binds:mini_width`, `binds:mini_height`, the `mini` socket event, and `"mini"` in
   `hyprctl clients -j`. See [Mini windows](../mini-windows/).
-- **Superposition windows**: the `superposition` window rule, and the `superposition:*` options. See
+- **Superposition windows**: the `superposition` window rule, and the `superposition:*` options, among them
+  `superposition:over_fullscreen` to keep the strip out of fullscreen windows. See
   [Superposition](../superposition/).
 - **Plus Tiles**: the `plustile` and `plus_locked` window rules, `hl.dsp.plus.*` (Move Edge, Fit to Neighbors,
   reset, geometric focus, inspector), the `plus:*` options and `hyprctl plus`. See [Plus Tiles](../plustile/).
-- **Drag options**: `binds:drag_keep_grab_point` and `binds:drag_guide`. See [Drag](../drag/).
+- **Drag options**: `binds:drag_keep_grab_point`, `binds:drag_guide` and `binds:drag_fullscreen_edge` (drop a dragged
+  window at the top of the screen to fullscreen it, off by default). See [Drag](../drag/).
 - **hyprctl**: `dots`, `store` (or `save`) and `load`. See [hyprctl additions](../hyprctl/).
 - **Desk** (0.56.2.p2): desktop peek (`hl.dsp.plus.peek`), locate pointer and shake to find
   (`hl.dsp.plus.locate_pointer`, `plus:shake_to_find`), and the `hold_focus` window rule with `plus:game_hold_focus`.

@@ -846,6 +846,7 @@ there. [Changes from upstream](../../../hyprland-plus/changes/) shows how to kee
 Category: `binds`
 | Name | Description | Type | Default | Limits |
 | --- | --- | --- | --- | --- |
+| drag_fullscreen_edge | Drop a dragged window within this many pixels of the top of its monitor and it becomes fullscreen. `0`: off. See [Drag](../../../hyprland-plus/drag/) | int | `0` | [0 - 512] |
 | drag_guide | While a tiled window is dragged, tint the tile under the cursor: the tile it will swap with. See [Drag](../../../hyprland-plus/drag/) | bool | `true` | |
 | drag_keep_grab_point | A tiled or fullscreen window that becomes floating while dragged keeps the pixel offset between the cursor and the window. `false` centres it on the cursor, as upstream does | bool | `true` | |
 | mini_height | Height in pixels of a mini window. See [Mini windows](../../../hyprland-plus/mini-windows/) | int | `54` | [16 - 8192] |

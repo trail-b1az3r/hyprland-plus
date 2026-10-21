@@ -24,6 +24,7 @@ superposition windows on a workspace share the strip, stacked along the edge.
 | `superposition:edge` | `1` | Which edge the strip is on: `0` left, `1` right, `2` top, `3` bottom. Changing it re-lays the layout. |
 | `superposition:size` | `0.12` | The strip's width (left or right) or height (top or bottom), as a fraction of the screen, from `0.02` to `0.5`. |
 | `superposition:reserve` | `false` | `false` draws the strip over the tiles. `true` takes the strip out of the tiles' area, so they make room for it. |
+| `superposition:over_fullscreen` | `true` | `true` keeps the strip above a fullscreen window, covering the strip's share of its edge. `false` gives the fullscreen window the whole screen and hides the strip until it is not fullscreen. |
 
 ```lua
 hl.config({ superposition = { edge = 1, size = 0.12, reserve = true } })
