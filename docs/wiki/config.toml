@@ -84,6 +84,9 @@ name       = "hyprland-plus 0.56.2.p2"
 url        = "/version-selector/"
 outdated   = false  # set for any version that isn't the current one
 version    = ""     # only change when setting the version, otherwise it is "Latest git" by default
+# hyprland-plus releases with a wiki of their own, under /<version>/. scripts/build-wiki-versions.sh fills this in
+# from the release tags when the site is built; this is what a plain `hugo` build shows.
+plus       = ["0.56.2.p2", "0.56.2.p1"]
 list       = [
   "0.56.0",
   "0.55.0",

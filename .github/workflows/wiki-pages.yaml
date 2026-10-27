@@ -2,13 +2,19 @@ name: Wiki site
 
 # Builds docs/wiki (Hugo, with the Hextra theme as a Go module) into https://trail-b1az3r.github.io/hyprland-plus/
 # and publishes it with GitHub Pages. Every push that touches the wiki builds it; only the default branch publishes.
+# Versioned: the latest wiki at the root, and the wiki of each release (each v* tag) under /<version>/
+# (scripts/build-wiki-versions.sh). It runs again after the Releases workflow, so a new release gets its own.
 # One-time setup: Settings > Pages > Build and deployment > Source: GitHub Actions.
 
 on:
   push:
     paths:
       - "docs/wiki/**"
+      - "scripts/build-wiki-versions.sh"
       - ".github/workflows/wiki-pages.yaml"
+  workflow_run:
+    workflows: ["Releases"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -42,10 +48,10 @@ jobs:
           tar -xzf "$RUNNER_TEMP/hugo.tgz" -C "$RUNNER_TEMP" hugo
           "$RUNNER_TEMP/hugo" version
 
-      - name: Build the wiki
-        working-directory: docs/wiki
+      - name: Build the wiki, and the wiki of each release
         run: |
-          "$RUNNER_TEMP/hugo" --gc --minify --baseURL "https://trail-b1az3r.github.io/hyprland-plus/" -d "$GITHUB_WORKSPACE/_site"
+          git fetch --tags --force origin
+          scripts/build-wiki-versions.sh "$GITHUB_WORKSPACE/_site" "https://trail-b1az3r.github.io/hyprland-plus" "$RUNNER_TEMP/hugo"
 
       - uses: actions/upload-pages-artifact@v3
         with:
