@@ -13,6 +13,7 @@
 #include "../../protocols/XDGShell.hpp"
 #include "../../render/Renderer.hpp"
 #include "../../state/MonitorState.hpp"
+#include "../../managers/EventManager.hpp"
 
 #include <string_view>
 
@@ -252,8 +253,73 @@ void CDragStateController::dragBegin(SP<ITarget> target, eMouseBindMode mode, st
     if (isResizeMode(m_dragMode))
         setXDGResizingState(DRAGGINGTARGET, true);
 }
+static Plus::SRect wallRect(const CBox& box) {
+    return {.x = box.x, .y = box.y, .w = box.w, .h = box.h};
+}
+
+void CDragStateController::applyMonitorWall(Vector2D& pos, const Vector2D& size) {
+    static auto PWALL = CConfigValue<Config::INTEGER>("plus:monitor_wall");
+    if (*PWALL <= 0 || m_draggingTiled)
+        return;
+
+    const auto&              MONITORS = State::monitorState()->monitors();
+    std::vector<Plus::SRect> rects;
+    std::vector<PHLMONITOR>  order;
+    for (const auto& m : MONITORS) {
+        if (!m || !m->m_enabled)
+            continue;
+        rects.push_back(wallRect(m->logicalBox()));
+        order.push_back(m);
+    }
+    if (rects.size() < 2)
+        return;
+
+    const Plus::SRect WANTED = {.x = pos.x, .y = pos.y, .w = size.x, .h = size.y};
+    if (!m_wallStarted) {
+        const auto BEGIN = m_beginDragPositionXY + size / 2.F;
+        const auto HOME  = State::monitorState()->query().vec(BEGIN).run();
+        if (!HOME)
+            return;
+        m_wall.begin(wallRect(HOME->logicalBox()), {.x = m_beginDragPositionXY.x, .y = m_beginDragPositionXY.y, .w = size.x, .h = size.y});
+        m_wallStarted = true;
+    }
+
+    const auto STEP = m_wall.step(WANTED, rects, *PWALL);
+    pos             = {STEP.x, STEP.y};
+
+    if (STEP.brokeThrough && !m_wallPushedOn.empty())
+        g_pEventManager->postEvent(SHyprIPCEvent{.event = "monitorwallbreak", .data = m_wallPushedOn});
+
+    if (!STEP.push) {
+        endMonitorWall();
+        return;
+    }
+
+    const auto& PUSH = *STEP.push;
+    const auto  NAME = order[PUSH.monitor]->m_name;
+    if (NAME != m_wallPushedOn && !m_wallPushedOn.empty())
+        g_pEventManager->postEvent(SHyprIPCEvent{.event = "monitorwall", .data = std::format("{},none,0,0,0", m_wallPushedOn)});
+    m_wallPushedOn = NAME;
+    // monitor, the edge of it the bulge is on, where along that edge it starts and how long it is (its own logical
+    // pixels), and how far in, 0..1.
+    g_pEventManager->postEvent(SHyprIPCEvent{
+        .event = "monitorwall",
+        .data  = std::format("{},{},{},{},{:.3f}", NAME, Plus::edgeName(PUSH.edge), sc<int>(PUSH.start), sc<int>(PUSH.length), PUSH.strength),
+    });
+}
+
+void CDragStateController::endMonitorWall() {
+    if (!m_wallPushedOn.empty())
+        g_pEventManager->postEvent(SHyprIPCEvent{.event = "monitorwall", .data = std::format("{},none,0,0,0", m_wallPushedOn)});
+    m_wallPushedOn.clear();
+}
+
 void CDragStateController::dragEnd() {
     auto draggingTarget = m_target.lock();
+
+    endMonitorWall();
+    m_wall.end();
+    m_wallStarted = false;
 
     m_mouseMoveEventCount = 1;
 
@@ -403,6 +469,8 @@ void CDragStateController::mouseMove(const Vector2D& mousePos) {
 
         if (*SNAPENABLED && !m_draggingTiled)
             g_layoutManager->performSnap(newPos, newSize, DRAGGINGTARGET, MBIND_MOVE, -1, m_beginDragSizeXY);
+
+        applyMonitorWall(newPos, newSize);
 
         newPos = newPos.round();
 

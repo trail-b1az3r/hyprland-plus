@@ -60,6 +60,8 @@ E.g.: `workspace>>2`
 | closewindow | emitted when a window is closed | `WINDOWADDRESS` |
 | kill | emitted when a window is killed (via `hyprctl kill`) | `WINDOWADDRESS` |
 | movewindow | emitted when a window is moved to a workspace | `WINDOWADDRESS`,`WORKSPACENAME` |
+| monitorwall | hyprland-plus: a dragged window is held against the wall between monitors (`plus:monitor_wall`), or the push ended (`none`) | `MONITORNAME`,`EDGE`,`START`,`LENGTH`,`STRENGTH` |
+| monitorwallbreak | hyprland-plus: the wall gave and the window went through | `MONITORNAME` |
 | movewindowv2 | emitted when a window is moved to a workspace | `WINDOWADDRESS`,`WORKSPACEID`,`WORKSPACENAME` |
 | openlayer | emitted when a layerSurface is mapped | `NAMESPACE` |
 | closelayer | emitted when a layerSurface is unmapped | `NAMESPACE` |

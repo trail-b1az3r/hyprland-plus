@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../target/Target.hpp"
+#include "../../plus/MonitorWall.hpp"
 #include "../../managers/input/InputManager.hpp"
 
 #include <optional>
@@ -55,5 +56,13 @@ namespace Layout::Supplementary {
         Vector2D                           m_draggingWindowOriginalFloatSize;
         Layout::eRectCorner                m_grabbedCorner = sc<Layout::eRectCorner>(0) /* CORNER_NONE */;
         std::optional<Layout::eRectCorner> m_forcedGrabbedCorner;
+
+        // plus:monitor_wall: the wall at edges shared with another monitor, and the monitor its bulge was last sent for.
+        Plus::CMonitorWall m_wall;
+        bool               m_wallStarted = false;
+        std::string        m_wallPushedOn;
+
+        void               applyMonitorWall(Vector2D& pos, const Vector2D& size);
+        void               endMonitorWall();
     };
 };
