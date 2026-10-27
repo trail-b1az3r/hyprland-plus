@@ -65,3 +65,21 @@ hl.config({ binds = { drag_fullscreen_edge = 8 } })
 - The guide: `CPlusTiles::renderDragGuide` in `src/plus/PlusTiles.cpp`
 - `floatingGrab`: `src/layout/supplementary/DragController.cpp`
 - The guide: `renderDragGuide` in `src/render/Renderer.cpp`
+
+## The wall between monitors: `plus:monitor_wall`
+
+Drag a window against an edge it shares with another monitor and it stops there, as if against something elastic.
+Push on, and once the window would be this many pixels past the edge, the wall gives and the window goes through.
+Pull it back inside its monitor and the wall stands again. Edges with no monitor beyond them have no wall.
+
+- **Type:** integer, in pixels. **Default:** `120`. `0` turns the wall off.
+- Move drags of floating windows (and of tiled windows once they float for the drag) only.
+- While a window is held, the `monitorwall` [event](../../ipc/) says where it would come in on the other monitor, so
+  a shell can draw the wall bulging there: `MONITORNAME,EDGE,START,LENGTH,STRENGTH`. `EDGE` is that monitor's edge
+  (`left`, `right`, `top`, `bottom`), `START` and `LENGTH` where along it the window's side is, in the monitor's own
+  logical pixels, and `STRENGTH` how far into the wall it is, from `0` to `1`. `MONITORNAME,none,0,0,0` when the
+  push ends, and `monitorwallbreak` (`MONITORNAME`) when the wall gives. Halcyon draws the bulge.
+
+```lua
+hl.config({ plus = { monitor_wall = 160 } })   -- a firmer wall
+```

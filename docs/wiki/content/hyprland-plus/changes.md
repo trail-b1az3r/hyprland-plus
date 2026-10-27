@@ -25,6 +25,8 @@ hyprland-plus is Hyprland 0.56.2 (upstream tag `v0.56.2`) with the changes below
   reset, geometric focus, inspector), the `plus:*` options and `hyprctl plus`. See [Plus Tiles](../plustile/).
 - **Drag options**: `binds:drag_keep_grab_point`, `binds:drag_guide` and `binds:drag_fullscreen_edge` (drop a dragged
   window at the top of the screen to fullscreen it, off by default). See [Drag](../drag/).
+- **The wall between monitors** (0.56.2.p3): `plus:monitor_wall`, and the `monitorwall` and `monitorwallbreak`
+  events. See [Drag](../drag/).
 - **hyprctl**: `dots`, `store` (or `save`) and `load`. See [hyprctl additions](../hyprctl/).
 - **Desk** (0.56.2.p2): desktop peek (`hl.dsp.plus.peek`), locate pointer and shake to find
   (`hl.dsp.plus.locate_pointer`, `plus:shake_to_find`), and the `hold_focus` window rule with `plus:game_hold_focus`.

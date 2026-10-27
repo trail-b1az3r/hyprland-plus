@@ -550,6 +550,10 @@ std::vector<SP<IValue>> Values::getConfigValues() {
                 "If above 0, a window dropped with the cursor within this many pixels of the top of its monitor becomes fullscreen (move drags only, "
                 "and only once the cursor has moved from where the drag began). 0 turns it off.",
                 0, {.min = 0, .max = 512}),
+        MS<Int>("plus:monitor_wall",
+                "How hard a dragged window has to push, in pixels, to go onto another monitor: it stops at the shared edge like against something "
+                "elastic, and goes through once pushed this far past it (the monitorwall event says where, for the shell's bulge). 0: no wall.",
+                120, {.min = 0, .max = 2000}),
         MS<Int>("superposition:edge", "Screen edge superposition windows tile to: 0 left, 1 right, 2 top, 3 bottom.", 1,
                 {.min = 0, .max = 3, .refresh = Supplementary::REFRESH_LAYOUTS}),
         MS<Float>("superposition:size", "Width (left/right) or height (top/bottom) of the superposition strip, as a fraction of the screen.", 0.12,
