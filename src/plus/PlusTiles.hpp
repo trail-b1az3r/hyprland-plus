@@ -33,6 +33,10 @@
 #include <string>
 #include <vector>
 
+namespace Render {
+    class CRenderContext;
+}
+
 namespace Plus {
 
     enum eFeedbackKind : uint8_t {
@@ -89,8 +93,8 @@ namespace Plus {
         std::string boardInfo(PHLWORKSPACE workspace, bool json) const;
 
         // Rendering, called by the renderer after a workspace's windows.
-        void renderDragGuide(PHLMONITOR monitor, PHLWORKSPACE workspace);
-        void render(PHLMONITOR monitor, PHLWORKSPACE workspace);
+        void renderDragGuide(PHLMONITOR monitor, PHLWORKSPACE workspace, Render::CRenderContext& ctx);
+        void render(PHLMONITOR monitor, PHLWORKSPACE workspace, Render::CRenderContext& ctx);
 
       private:
         struct SWindowState {

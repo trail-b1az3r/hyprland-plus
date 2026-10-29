@@ -23,6 +23,10 @@
 #include <string>
 #include <vector>
 
+namespace Render {
+    class CRenderContext;
+}
+
 namespace Plus {
 
     class CDesk {
@@ -38,7 +42,7 @@ namespace Plus {
         // Every pointer move, for plus:shake_to_find.
         void onPointerMove(const Vector2D& pos);
         // Drawn above everything but the cursor.
-        void render(PHLMONITOR monitor);
+        void render(PHLMONITOR monitor, Render::CRenderContext& ctx);
 
         bool holdsFocus(PHLWINDOW window) const;
 

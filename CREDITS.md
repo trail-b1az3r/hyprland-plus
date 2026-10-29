@@ -1,6 +1,6 @@
 # Credits
 
-hyprland-plus is Hyprland 0.56.2 with the Halcyon additions. Hyprland and the libraries it is built
+hyprland-plus is Hyprland 0.57.0 with the Halcyon additions. Hyprland and the libraries it is built
 on are the work of the people named here. The fork's own licence is [LICENSE](LICENSE) (BSD-3-Clause).
 
 ## Hyprland

@@ -3,16 +3,16 @@ weight: 20
 title: Changes from upstream
 ---
 
-hyprland-plus is Hyprland 0.56.2 (upstream tag `v0.56.2`) with the changes below. Everything else is upstream.
+hyprland-plus is Hyprland 0.57.0 (upstream tag `v0.57.0`) with the changes below. Everything else is upstream.
 
 ## Behaviour that differs
 
-| Area | Upstream 0.56.2 | hyprland-plus |
+| Area | Upstream 0.57.0 | hyprland-plus |
 |---|---|---|
-| Dragging a tiled window that floats | Centres it on the cursor | Keeps the grab point. Set `binds:drag_keep_grab_point = false` to get the old behaviour. |
+| Dragging a tiled window that floats | Centres it on the cursor (`binds:drag_center_window`, on) | Keeps the grab point: `binds:drag_keep_grab_point`, on, wins over `drag_center_window`. Set it to `false` to let `drag_center_window` decide. |
 | Tile under the cursor during a drag | Nothing | Tinted, showing the swap target. Off with `binds:drag_guide = false`. |
 | `SUPER + ALT + F` | Fullscreen | Still fullscreen. Fit to Neighbors is on `SUPER + CTRL + F` in the Halcyon dotfiles. |
-| `hyprland --version` | `Hyprland 0.56.2` | `hyprland-plus 0.56.2.p2 (Hyprland 0.56.2)`, from the `PLUS_VERSION` file |
+| `hyprland --version` | `Hyprland 0.57.0` | `hyprland-plus 0.57.0.p1 (Hyprland 0.57.0)`, from the `PLUS_VERSION` file |
 
 ## New in hyprland-plus
 
@@ -27,6 +27,8 @@ hyprland-plus is Hyprland 0.56.2 (upstream tag `v0.56.2`) with the changes below
   window at the top of the screen to fullscreen it, off by default). See [Drag](../drag/).
 - **The wall between monitors** (0.56.2.p3): `plus:monitor_wall`, and the `monitorwall` and `monitorwallbreak`
   events. See [Drag](../drag/).
+- **Frame cap** (0.57.0.p1): `plus:max_fps` draws each monitor at most that many times a second, for battery
+  saving. See [Config options](../../configuring/core/config-options/).
 - **hyprctl**: `dots`, `store` (or `save`) and `load`. See [hyprctl additions](../hyprctl/).
 - **Desk** (0.56.2.p2): desktop peek (`hl.dsp.plus.peek`), locate pointer and shake to find
   (`hl.dsp.plus.locate_pointer`, `plus:shake_to_find`), and the `hold_focus` window rule with `plus:game_hold_focus`.

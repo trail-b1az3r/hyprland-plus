@@ -2,9 +2,9 @@
 
 #include "../config/ConfigValue.hpp"
 #include "../config/shared/complex/ComplexDataTypes.hpp"
-#include "../desktop/Workspace.hpp"
+#include "../workspace/HLWorkspace.hpp"
 #include "../desktop/rule/windowRule/WindowRuleApplicator.hpp"
-#include "../desktop/view/Window.hpp"
+#include "../desktop/view/window/Window.hpp"
 #include "../managers/input/InputManager.hpp"
 #include "../output/Monitor.hpp"
 #include "../protocols/types/ContentType.hpp"
@@ -155,7 +155,7 @@ void CDesk::onPointerMove(const Vector2D& pos) {
         locatePointer();
 }
 
-void CDesk::render(PHLMONITOR monitor) {
+void CDesk::render(PHLMONITOR monitor, Render::CRenderContext& ctx) {
     static auto PDURATION = CConfigValue<Config::INTEGER>("plus:locate_duration");
     static auto PSIZE     = CConfigValue<Config::INTEGER>("plus:locate_size");
     static auto PCOLOR    = CConfigValue<Config::INTEGER>("plus:feedback:locate_color");
@@ -185,7 +185,7 @@ void CDesk::render(PHLMONITOR monitor) {
     glow.box   = BOX;
     glow.color = colorOf(*PCOLOR, FRAME.alpha * 0.18);
     glow.round = sc<int>(std::round(R));
-    g_pHyprRenderer->m_renderPass.add(makeUnique<CRectPassElement>(glow));
+    Render::IHyprRenderer::addPassElement(ctx, makeUnique<CRectPassElement>(glow));
 
     CBorderPassElement::SBorderData ring;
     ring.box        = BOX;
@@ -193,7 +193,7 @@ void CDesk::render(PHLMONITOR monitor) {
     ring.a          = sc<float>(FRAME.alpha);
     ring.round      = sc<int>(std::round(R));
     ring.borderSize = sc<int>(std::max(2.0, std::round(4.0 * SCALE)));
-    g_pHyprRenderer->m_renderPass.add(makeUnique<CBorderPassElement>(ring));
+    Render::IHyprRenderer::addPassElement(ctx, makeUnique<CBorderPassElement>(ring));
 }
 
 // Hold focus
@@ -201,7 +201,7 @@ void CDesk::render(PHLMONITOR monitor) {
 bool CDesk::holdsFocus(PHLWINDOW window) const {
     static auto PGAMES = CConfigValue<Config::BOOL>("plus:game_hold_focus");
 
-    if (!window || !window->m_isMapped)
+    if (!window || !window->mapped())
         return false;
     if (window->m_ruleApplicator->holdFocus().valueOrDefault())
         return true;
