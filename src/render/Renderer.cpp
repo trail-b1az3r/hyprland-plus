@@ -662,7 +662,7 @@ void IHyprRenderer::renderWindow(CRenderContext& ctx, PHLWINDOW pWindow, PHLMONI
     // hyprland-plus desktop peek (src/plus/Desk.hpp): 1 outside a peek.
     const float PEEKOPACITY = standalone ? 1.F : Plus::desk()->windowOpacity(pMonitor);
     renderdata.fadeAlpha *= PEEKOPACITY;
-    renderdata.alpha     = presentation.alpha;
+    renderdata.alpha = presentation.alpha;
     renderdata.decorate =
         decorate && !pWindow->backend().traits().suggestsNoBorder && Fullscreen::controller()->getFullscreenModes(pWindow).internal != Fullscreen::FSMODE_FULLSCREEN;
     renderdata.rounding      = standalone || renderdata.dontRound ? 0 : pWindow->presentation().rounding() * pMonitor->m_scale;

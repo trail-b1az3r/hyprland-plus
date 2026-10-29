@@ -910,8 +910,9 @@ std::string CPlusTiles::inspect(PHLWINDOW w, bool json) const {
     }
 
     if (json) {
-        std::string out = std::format("{{\"address\": \"0x{:x}\", \"class\": \"{}\", \"title\": \"{}\", \"state\": \"{}\", \"plustile\": {}, \"modified\": {}, \"locked\": {}",
-                                      rc<uintptr_t>(w.get()), jsonEscape(w->metadata().appID()), jsonEscape(w->metadata().title()), jsonEscape(state), participates(w), MODIFIED, LOCKED);
+        std::string out =
+            std::format("{{\"address\": \"0x{:x}\", \"class\": \"{}\", \"title\": \"{}\", \"state\": \"{}\", \"plustile\": {}, \"modified\": {}, \"locked\": {}",
+                        rc<uintptr_t>(w.get()), jsonEscape(w->metadata().appID()), jsonEscape(w->metadata().title()), jsonEscape(state), participates(w), MODIFIED, LOCKED);
         if (T) {
             out += std::format(", \"geometry\": [{:.0f}, {:.0f}, {:.0f}, {:.0f}], \"min\": [{:.0f}, {:.0f}], \"max\": [{:.0f}, {:.0f}]", T->rect.x, T->rect.y, T->rect.w, T->rect.h,
                                T->minW, T->minH, T->maxW, T->maxH);
