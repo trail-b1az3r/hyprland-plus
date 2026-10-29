@@ -866,6 +866,7 @@ Category: `plus`. See [Plus Tiles](../../../hyprland-plus/plustile/).
 | max_height | Largest height an edge move can give a tile. `0`: no limit | int | `0` | [0 - 16384] |
 | max_width | Largest width an edge move can give a tile. `0`: no limit | int | `0` | [0 - 16384] |
 | min_height | Smallest height edge moves can make a tile or its neighbours | int | `90` | [16 - 8192] |
+| max_fps | Draw each monitor at most this many times a second, to save power; frames asked for sooner are drawn at the next turn. Halcyon's super battery saver sets `12`. `0`: no limit | int | `0` | [0 - 1000] |
 | monitor_wall | How far, in pixels, a dragged window has to push past an edge shared with another monitor to go through; it is held there until then. `0`: no wall. See [Drag](../../../hyprland-plus/drag/) | int | `120` | [0 - 2000] |
 | min_width | Smallest width edge moves can make a tile or its neighbours | int | `120` | [16 - 8192] |
 | step | Edge move step, in pixels | int | `40` | [1 - 4000] |

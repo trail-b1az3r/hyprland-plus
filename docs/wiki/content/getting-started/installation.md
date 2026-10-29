@@ -4,7 +4,7 @@ title: Installation
 ---
 
 > [!NOTE]
-> This is the upstream Hyprland install guide. hyprland-plus is a fork of Hyprland 0.56.2, installed another way.
+> This is the upstream Hyprland install guide. hyprland-plus is a fork of Hyprland 0.57.0, installed another way.
 > See [Install hyprland-plus](../../hyprland-plus/install/).
 
 > [!WARNING]

@@ -73,7 +73,7 @@ jobs:
             --target "$SHA" \
             --latest \
             --title "hyprland-plus $VER" \
-            --notes "Hyprland 0.56.2 with the Halcyon additions: mini windows, superposition windows, plustile windows and a drag fix. Built from $BRANCH at commit ${SHA:0:12}. Check a download with \`sha256sum -c hyprland-plus-$VER.tar.gz.sha256\`."
+            --notes "Hyprland $(cat VERSION) with the Halcyon additions: mini windows, superposition windows, plustile windows and a drag fix. Built from $BRANCH at commit ${SHA:0:12}. Check a download with \`sha256sum -c hyprland-plus-$VER.tar.gz.sha256\`."
 
   nightly:
     name: Publish hyprland-plus-git

@@ -4,7 +4,7 @@
 
 # hyprland-plus
 
-Hyprland 0.56.2, with the Halcyon changes described below.
+Hyprland 0.57.0, with the Halcyon changes described below.
 
 <br>
 
@@ -56,12 +56,12 @@ says whether one is waiting (no sudo).
 
 Other distributions: build it by hand with the same steps. The AUR package is described in `packaging/aur/`.
 
-For Hyprland's own documentation, see the [configuration guide](https://wiki.hypr.land/Configuring/). It applies here,
-because this is Hyprland 0.56.2 with additions.
+For Hyprland's own documentation, see the [configuration guide](https://wiki.hypr.land/configuring/). It applies here,
+because this is Hyprland 0.57.0 with additions.
 
 # What this fork adds
 
-This is Hyprland 0.56.2 (upstream tag `v0.56.2`) with the changes below.
+This is Hyprland 0.57.0 (upstream tag `v0.57.0`) with the changes below.
 
 ## Dragging a tiled window: `binds:drag_keep_grab_point`
 
@@ -172,6 +172,15 @@ hl.bind("SUPER + ALT + Right", hl.dsp.window.resize_edge({ edge = "right", amoun
 Source: `plustile` in `src/desktop/rule/windowRule/`, `resizeEdge` in `src/config/shared/actions/ConfigActions.cpp`,
 and `hl.dsp.window.resize_edge` in `src/config/lua/bindings/LuaBindingsDispatchers.cpp`.
 
+## New in 0.57.0.p1
+
+- **Based on Hyprland 0.57.0.** Every hyprland-plus addition carried over. Upstream 0.57 now keeps the grab point
+  itself when `binds:drag_center_window` is off; `binds:drag_keep_grab_point` (on) still wins, so a drag behaves as it
+  did.
+- **Frame cap**: `plus:max_fps` draws each monitor at most that many times a second (0, the default, is no limit).
+  Frames asked for sooner wait for their turn and then show everything that changed. Halcyon's super battery saver
+  sets 12.
+
 ## New in 0.56.2.p2
 
 - **Hold focus, for games**: the `hold_focus` window rule, or `plus:game_hold_focus` for every window whose content type
@@ -191,8 +200,8 @@ See [Desk](docs/wiki/content/hyprland-plus/desk.md) and [Mini windows](docs/wiki
 
 ## Version string
 
-`hyprland --version` reports `hyprland-plus 0.56.2.p2`, from the `PLUS_VERSION` file. The fork is based on upstream
-0.56.2, and `VERSION` keeps the numeric version that CMake needs. The binary and the config directory names are
+`hyprland --version` reports `hyprland-plus 0.57.0.p1`, from the `PLUS_VERSION` file. The fork is based on upstream
+0.57.0, and `VERSION` keeps the numeric version that CMake needs. The binary and the config directory names are
 unchanged, so existing configs and session files keep working.
 
 ## Logo
@@ -207,10 +216,10 @@ tested on a running session yet. Test a drag of a tiled window and a click on a 
 
 # Features
 
-- All of the eyecandy: gradient borders, blur, animations, shadows and much more
+- All of the eyecandy: gradient borders, many types of blur, animations, glow, shadows and much more
 - A lot of customization
 - 100% independent, no wlroots, no libweston, no kwin, no mutter.
-- Custom bezier curves for the best animations
+- Custom bezier and spring curves for the best animations
 - Powerful plugin support
 - Built-in plugin manager
 - Tearing support for better gaming performance
@@ -218,8 +227,6 @@ tested on a running session yet. Test a drag of a tiled window and a click on a 
 - Fast and active development
 - Not afraid to provide bleeding-edge features
 - Config reloaded instantly upon saving
-- Fully dynamic workspaces
-- Two built-in layouts and more available as plugins
 - Global keybinds passed to your apps of choice
 - Tiling/pseudotiling/floating/fullscreen windows
 - Special workspaces (scratchpads)
@@ -227,6 +234,15 @@ tested on a running session yet. Test a drag of a tiled window and a click on a 
 - Powerful window/monitor/layer rules
 - Socket-based IPC
 - Native IME and Input Panels Support
+- Fully dynamic workspaces
+- Extensive layout support
+    - Dwindle
+    - Scrolling
+    - Master
+    - Monocle
+    - Custom layout with Lua
+    - Custom layouts with plugins
+- Per Workspace Layouts
 - and much more...
 
 <br>
@@ -275,7 +291,7 @@ code, are in [CREDITS.md](CREDITS.md).
 
 <!----------------------------------------------------------------------------->
 
-[Configure]: https://wiki.hypr.land/Configuring/
+[Configure]: https://wiki.hypr.land/configuring/
 [Stars]: https://starchart.cc/trail-b1az3r/hyprland-plus
 [Hypr]: https://github.com/hyprwm/Hypr
 
@@ -283,9 +299,9 @@ code, are in [CREDITS.md](CREDITS.md).
 [Issues]: https://github.com/trail-b1az3r/hyprland-plus/issues
 [Todo]: https://github.com/trail-b1az3r/hyprland-plus/projects
 
-[Contribute]: https://wiki.hypr.land/Contributing-and-Debugging/
+[Contribute]: https://wiki.hypr.land/contributing-and-debugging/
 [Install]: #install
-[Quick Start]: https://wiki.hypr.land/Getting-Started/Master-Tutorial/
+[Quick Start]: https://wiki.hypr.land/getting-started/master-tutorial/
 [Workflow]: https://github.com/trail-b1az3r/hyprland-plus/actions/workflows/ci.yaml
 [License]: LICENSE
 

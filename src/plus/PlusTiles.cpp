@@ -5,10 +5,10 @@
 #include "../config/shared/actions/ConfigActions.hpp"
 #include "../config/shared/complex/ComplexDataTypes.hpp"
 #include "../debug/log/Logger.hpp"
-#include "../desktop/Workspace.hpp"
+#include "../workspace/HLWorkspace.hpp"
 #include "../desktop/state/FocusState.hpp"
 #include "../desktop/state/ViewState.hpp"
-#include "../desktop/view/Window.hpp"
+#include "../desktop/view/window/Window.hpp"
 #include "../event/EventBus.hpp"
 #include "../layout/LayoutManager.hpp"
 #include "../layout/space/Space.hpp"
@@ -192,7 +192,7 @@ bool CPlusTiles::enabled() const {
 
 bool CPlusTiles::participates(PHLWINDOW w) const {
     static auto PALL = CConfigValue<Config::BOOL>("plus:all_tiled");
-    if (!enabled() || !w || !w->m_isMapped || w->m_isFloating || w->isMini() || Fullscreen::controller()->isFullscreen(w))
+    if (!enabled() || !w || !w->mapped() || w->isFloating() || w->isMini() || Fullscreen::controller()->isFullscreen(w))
         return false;
     if (w->m_ruleApplicator->superposition().valueOrDefault())
         return false;
@@ -222,16 +222,16 @@ std::optional<CTileBoard> CPlusTiles::board(PHLWORKSPACE ws) const {
     static auto PMAXW = CConfigValue<Config::INTEGER>("plus:max_width");
     static auto PMAXH = CConfigValue<Config::INTEGER>("plus:max_height");
 
-    if (!ws || !ws->m_space)
+    if (!ws || !ws->space())
         return std::nullopt;
 
     std::vector<STile> tiles;
-    for (const auto& wt : ws->m_space->targets()) {
+    for (const auto& wt : ws->space()->targets()) {
         const auto T = wt.lock();
         if (!T || T->floating())
             continue;
         const auto W = T->window();
-        if (!W || !W->m_isMapped || W->isHidden() || W->isMini() || Fullscreen::controller()->isFullscreen(W))
+        if (!W || !W->mapped() || W->isHidden() || W->isMini() || Fullscreen::controller()->isFullscreen(W))
             continue;
         if (W->m_ruleApplicator->superposition().valueOrDefault())
             continue;
@@ -261,13 +261,13 @@ std::optional<CTileBoard> CPlusTiles::board(PHLWORKSPACE ws) const {
         tiles.push_back(tile);
     }
 
-    return CTileBoard(std::move(tiles), rectOf(ws->m_space->workArea()), tolerance());
+    return CTileBoard(std::move(tiles), rectOf(ws->space()->workArea()), tolerance());
 }
 
 PHLWINDOW CPlusTiles::windowById(PHLWORKSPACE ws, uint64_t id) const {
-    if (!ws || !ws->m_space)
+    if (!ws || !ws->space())
         return nullptr;
-    for (const auto& wt : ws->m_space->targets()) {
+    for (const auto& wt : ws->space()->targets()) {
         const auto T = wt.lock();
         if (T && T->window() && idOf(T->window()) == id)
             return T->window();
@@ -306,7 +306,7 @@ void CPlusTiles::prune() {
 std::string CPlusTiles::nameOf(PHLWINDOW w) const {
     if (!w)
         return "?";
-    const std::string CLASS = w->m_class.empty() ? w->m_initialClass : w->m_class;
+    const std::string CLASS = w->metadata().appID().empty() ? w->metadata().initialAppID() : w->metadata().appID();
     return CLASS.empty() ? std::format("{:x}", rc<uintptr_t>(w.get())) : CLASS;
 }
 
@@ -431,7 +431,7 @@ void CPlusTiles::endEdit(bool commit) {
     m_enteredSubmap = false;
     m_submapBeforeEdit.clear();
 
-    if (!commit || !W || !W->m_isMapped)
+    if (!commit || !W || !W->mapped())
         return;
 
     std::vector<std::string> errors;
@@ -633,8 +633,8 @@ bool CPlusTiles::hasCustomTiles(PHLWORKSPACE ws) const {
         if (W && s.modified && W->m_workspace == ws)
             return true;
     }
-    if (ws && ws->m_space) {
-        for (const auto& wt : ws->m_space->targets()) {
+    if (ws && ws->space()) {
+        for (const auto& wt : ws->space()->targets()) {
             const auto T = wt.lock();
             if (T && T->window() && T->window()->m_ruleApplicator->plusLocked().valueOrDefault())
                 return true;
@@ -650,12 +650,12 @@ Result CPlusTiles::fit(PHLWINDOW w) {
         return std::unexpected(std::format("{} is not a Plus Tile", nameOf(w)));
 
     const auto WS = w->m_workspace;
-    if (!WS || !WS->m_space)
+    if (!WS || !WS->space())
         return std::unexpected("the window has no workspace");
 
     if (!isModified(w) && !w->m_ruleApplicator->plusLocked().valueOrDefault()) {
         // Ordinary tile: fit the space the layout assigns, by the layout's own rules.
-        WS->m_space->recalculate();
+        WS->space()->recalculate();
         if (const auto T = w->layoutTarget())
             flash(WS, rectOf(T->position()), FEEDBACK_EDGE);
         return {};
@@ -695,7 +695,7 @@ Result CPlusTiles::reset(PHLWINDOW w) {
 }
 
 Result CPlusTiles::restore(PHLWORKSPACE ws, PHLWINDOW priority, bool interactive) {
-    if (m_restoring || !ws || !ws->m_space)
+    if (m_restoring || !ws || !ws->space())
         return {};
 
     // Our own resizes must not start another restore.
@@ -812,7 +812,7 @@ Result CPlusTiles::focus(Math::eDirection direction) {
     };
 
     const auto W = Desktop::focusState()->window();
-    if (!enabled() || !W || W->m_isFloating)
+    if (!enabled() || !W || W->isFloating())
         return fallback();
 
     auto                    B = board(W->m_workspace);
@@ -911,7 +911,7 @@ std::string CPlusTiles::inspect(PHLWINDOW w, bool json) const {
 
     if (json) {
         std::string out = std::format("{{\"address\": \"0x{:x}\", \"class\": \"{}\", \"title\": \"{}\", \"state\": \"{}\", \"plustile\": {}, \"modified\": {}, \"locked\": {}",
-                                      rc<uintptr_t>(w.get()), jsonEscape(w->m_class), jsonEscape(w->m_title), jsonEscape(state), participates(w), MODIFIED, LOCKED);
+                                      rc<uintptr_t>(w.get()), jsonEscape(w->metadata().appID()), jsonEscape(w->metadata().title()), jsonEscape(state), participates(w), MODIFIED, LOCKED);
         if (T) {
             out += std::format(", \"geometry\": [{:.0f}, {:.0f}, {:.0f}, {:.0f}], \"min\": [{:.0f}, {:.0f}], \"max\": [{:.0f}, {:.0f}]", T->rect.x, T->rect.y, T->rect.w, T->rect.h,
                                T->minW, T->minH, T->maxW, T->maxH);
@@ -943,7 +943,7 @@ std::string CPlusTiles::inspect(PHLWINDOW w, bool json) const {
         return out;
     }
 
-    std::string out = std::format("{} ({}): {}\n", nameOf(w), w->m_title, state);
+    std::string out = std::format("{} ({}): {}\n", nameOf(w), w->metadata().title(), state);
     if (!T)
         return out + "Not on a tile board (floating, fullscreen, mini or superposition).\n";
 
@@ -1006,8 +1006,8 @@ SRect CPlusTiles::visualBox(const SRect& r, PHLWORKSPACE ws) const {
     auto* const GOUT         = sc<Config::CCssGapData*>(PGAPSOUTDATA.ptr());
 
     SRect       area = r;
-    if (ws && ws->m_space)
-        area = rectOf(ws->m_space->workArea());
+    if (ws && ws->space())
+        area = rectOf(ws->space()->workArea());
 
     auto       sticks = [](double a, double b) { return std::abs(a - b) < 2.0; };
     const auto L      = sticks(r.x, area.x) ? GOUT->m_left : GIN->m_left;
@@ -1044,7 +1044,7 @@ void CPlusTiles::damage(const SFeedback& f) const {
     g_pHyprRenderer->damageBox(boxOf(V));
 }
 
-void CPlusTiles::renderDragGuide(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace) {
+void CPlusTiles::renderDragGuide(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace, Render::CRenderContext& ctx) {
     static auto PDRAGGUIDE = CConfigValue<Config::BOOL>("binds:drag_guide");
     static auto PCOLOR     = CConfigValue<Config::INTEGER>("plus:feedback:placement_color");
     static auto PBORDER    = CConfigValue<Config::INTEGER>("plus:feedback:border_size");
@@ -1075,7 +1075,7 @@ void CPlusTiles::renderDragGuide(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace) {
 
     const auto HOVERED = Desktop::viewState()->hitTest().windowAt(g_pInputManager->getMouseCoordsInternal(),
                                                                   Desktop::View::ALLOW_FLOATING | Desktop::View::RESERVED_EXTENTS | Desktop::View::INPUT_EXTENTS, TARGET->window());
-    if (!HOVERED || HOVERED == TARGET->window() || HOVERED->m_isFloating || HOVERED->m_workspace != pWorkspace) {
+    if (!HOVERED || HOVERED == TARGET->window() || HOVERED->isFloating() || HOVERED->m_workspace != pWorkspace) {
         forget();
         return;
     }
@@ -1104,7 +1104,7 @@ void CPlusTiles::renderDragGuide(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace) {
         data.box   = boxOf(R);
         data.color = withAlpha(*PCOLOR, 1.0);
         data.round = sc<int>(*PROUNDING * pMonitor->m_scale);
-        g_pHyprRenderer->m_renderPass.add(makeUnique<CRectPassElement>(data));
+        Render::IHyprRenderer::addPassElement(ctx, makeUnique<CRectPassElement>(data));
     }
 
     if (*PBORDER > 0) {
@@ -1112,12 +1112,12 @@ void CPlusTiles::renderDragGuide(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace) {
             CRectPassElement::SRectData o;
             o.box   = boxOf(side);
             o.color = opaque(*PCOLOR);
-            g_pHyprRenderer->m_renderPass.add(makeUnique<CRectPassElement>(o));
+            Render::IHyprRenderer::addPassElement(ctx, makeUnique<CRectPassElement>(o));
         }
     }
 }
 
-void CPlusTiles::render(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace) {
+void CPlusTiles::render(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace, Render::CRenderContext& ctx) {
     static auto PENABLED   = CConfigValue<Config::BOOL>("plus:feedback:enabled");
     static auto PPLACEMENT = CConfigValue<Config::INTEGER>("plus:feedback:placement_color");
     static auto PEDGE      = CConfigValue<Config::INTEGER>("plus:feedback:edge_color");
@@ -1173,7 +1173,7 @@ void CPlusTiles::render(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace) {
             fill.box   = boxOf(R);
             fill.color = withAlpha(argb, *PFILL * ALPHA);
             fill.round = sc<int>(*PROUNDING * pMonitor->m_scale);
-            g_pHyprRenderer->m_renderPass.add(makeUnique<CRectPassElement>(fill));
+            Render::IHyprRenderer::addPassElement(ctx, makeUnique<CRectPassElement>(fill));
         }
 
         if (*PBORDER > 0 && !f.edge) {
@@ -1181,7 +1181,7 @@ void CPlusTiles::render(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace) {
                 CRectPassElement::SRectData o;
                 o.box   = boxOf(side);
                 o.color = opaque(argb, ALPHA);
-                g_pHyprRenderer->m_renderPass.add(makeUnique<CRectPassElement>(o));
+                Render::IHyprRenderer::addPassElement(ctx, makeUnique<CRectPassElement>(o));
             }
         }
 
@@ -1190,7 +1190,7 @@ void CPlusTiles::render(PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace) {
             bar.box   = boxOf(edgeBar(R, *f.edge, std::max(4.0, sc<double>(*PBORDER) * 3.0 * pMonitor->m_scale)));
             bar.color = opaque(argb, ALPHA);
             bar.round = sc<int>(std::max(2.0, sc<double>(*PBORDER) * pMonitor->m_scale));
-            g_pHyprRenderer->m_renderPass.add(makeUnique<CRectPassElement>(bar));
+            Render::IHyprRenderer::addPassElement(ctx, makeUnique<CRectPassElement>(bar));
         }
 
         // Keep fading flashes moving.
