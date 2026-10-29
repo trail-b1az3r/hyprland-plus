@@ -710,7 +710,8 @@ void CInputManager::mouseMoveUnified(uint32_t time, bool refocus, bool mouse, st
         }
 
         if (pFoundLayerSurface && (pFoundLayerSurface->m_layerSurface->m_current.keyboardInteractivity != ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE) && FOLLOWMOUSE != 3 &&
-            ((allowKeyboardRefocus && !HOLDFOCUS) || pFoundLayerSurface->m_layerSurface->m_current.keyboardInteractivity == ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE)) {
+            ((allowKeyboardRefocus && !HOLDFOCUS) ||
+             pFoundLayerSurface->m_layerSurface->m_current.keyboardInteractivity == ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE)) {
             Desktop::focusState()->rawSurfaceFocus(foundSurface);
         }
 

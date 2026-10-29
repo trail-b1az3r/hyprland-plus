@@ -171,7 +171,7 @@ namespace Desktop::View {
         WindowState m_state = WINDOW_STATE_NONE;
 
         // for recovering relative cursor position
-        Vector2D      m_relativeCursorCoordsOnLastWarp = Vector2D(-1, -1);
+        Vector2D m_relativeCursorCoordsOnLastWarp = Vector2D(-1, -1);
 
         // Mini window state, see hl.dsp.window.mini: the box to return to when the window is restored.
         bool          m_mini           = false;

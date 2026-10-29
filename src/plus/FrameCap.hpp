@@ -22,8 +22,8 @@ namespace Plus {
 
       private:
         struct SMonitorState {
-            Time::steady_tp      last;
-            SP<CEventLoopTimer>  timer;
+            Time::steady_tp     last;
+            SP<CEventLoopTimer> timer;
         };
         std::unordered_map<MONITORID, SMonitorState> m_monitors;
     };
