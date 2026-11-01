@@ -98,21 +98,28 @@ static void refocusTablet(SP<CTablet> tab, SP<CTabletTool> tool, bool motion = f
 
 static double applyArtPressureCurve(SP<CTabletTool> tool, double pressure, const Vector2D& tilt, double speed) {
     // Pressure curves and dynamics are deliberately app-scoped: handwriting, pointer navigation
-    // and ordinary UI keep the hardware's unmodified pressure values.
-    const auto SURFACE = Desktop::View::CWLSurface::fromResource(g_pSeatManager->m_state.pointerFocus.lock());
-    if (!SURFACE)
+    // and ordinary UI keep the hardware's unmodified pressure values. Cache the target app because
+    // this function runs on every pressure event.
+    const auto SURFACE_RESOURCE = tool->getSurface();
+    if (!SURFACE_RESOURCE)
         return pressure;
 
-    const auto WINDOW = Desktop::View::CWindow::fromView(SURFACE->view());
-    if (!WINDOW)
-        return pressure;
+    if (tool->m_pressureSurface.lock() != SURFACE_RESOURCE) {
+        tool->m_pressureSurface = SURFACE_RESOURCE;
+        tool->m_pressureSurfaceIsArtApp = false;
 
-    const auto APPID = WINDOW->metadata().appID();
-    const bool IS_ART_APP =
-        APPID.find("krita") != std::string::npos || APPID.find("gimp") != std::string::npos ||
-        APPID.find("inkscape") != std::string::npos || APPID.find("mypaint") != std::string::npos ||
-        APPID.find("blender") != std::string::npos;
-    if (!IS_ART_APP)
+        if (const auto SURFACE = Desktop::View::CWLSurface::fromResource(SURFACE_RESOURCE)) {
+            if (const auto WINDOW = Desktop::View::CWindow::fromView(SURFACE->view())) {
+                const auto APPID = WINDOW->metadata().appID();
+                tool->m_pressureSurfaceIsArtApp =
+                    APPID.find("krita") != std::string::npos || APPID.find("gimp") != std::string::npos ||
+                    APPID.find("inkscape") != std::string::npos || APPID.find("mypaint") != std::string::npos ||
+                    APPID.find("blender") != std::string::npos;
+            }
+        }
+    }
+
+    if (!tool->m_pressureSurfaceIsArtApp)
         return pressure;
 
     const auto CURVE = Config::mgr()->getDeviceString(tool->m_hlName, "pressure_curve", "input:tablettool:pressure_curve");
