@@ -273,4 +273,27 @@ TEST(Config, tabletPressureCurvePresetsAreValidated) {
     EXPECT_FALSE(VALIDATOR("aggressive").has_value());
 
     EXPECT_TRUE(std::ranges::contains(CONFIG_DEVICE_VALUE_NAMES, "input:tablettool:pressure_curve"));
+
+    struct SDynamicSetting {
+        std::string_view name;
+        float defaultValue;
+    };
+    constexpr std::array DYNAMIC_SETTINGS = {
+        SDynamicSetting{"input:tablettool:pressure_speed", 0.F},
+        SDynamicSetting{"input:tablettool:pressure_tilt", 0.F},
+    };
+    for (const auto& setting : DYNAMIC_SETTINGS) {
+        const auto DYNAMIC_VALUE = std::ranges::find_if(CONFIG_VALUES, [&setting](const auto& value) {
+            return std::string_view{value->name()} == setting.name;
+        });
+        ASSERT_NE(DYNAMIC_VALUE, CONFIG_VALUES.end());
+        const auto FLOAT_VALUE = dynamicPointerCast<CFloatValue>(*DYNAMIC_VALUE);
+        ASSERT_TRUE(FLOAT_VALUE);
+        EXPECT_FLOAT_EQ(FLOAT_VALUE->defaultVal(), setting.defaultValue);
+        ASSERT_TRUE(FLOAT_VALUE->m_min.has_value());
+        ASSERT_TRUE(FLOAT_VALUE->m_max.has_value());
+        EXPECT_FLOAT_EQ(*FLOAT_VALUE->m_min, 0.F);
+        EXPECT_FLOAT_EQ(*FLOAT_VALUE->m_max, 1.F);
+        EXPECT_TRUE(std::ranges::contains(CONFIG_DEVICE_VALUE_NAMES, setting.name));
+    }
 }
