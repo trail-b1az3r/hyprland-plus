@@ -46,6 +46,7 @@ jobs:
           sed -i -E "s/^pkgver=.*/pkgver=$VERSION/" packaging/aur/PKGBUILD
           sed -i -E "s|(hyprland-plus::git\\+https://github.com/trail-b1az3r/hyprland-plus.git#commit=)[0-9a-f]+|\\1$RELEASE_SHA|" packaging/aur/PKGBUILD
           grep -q "commit=$RELEASE_SHA" packaging/aur/PKGBUILD
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           mkdir -p "$RUNNER_TEMP/aur-package"
           cp packaging/aur/PKGBUILD "$RUNNER_TEMP/aur-package/PKGBUILD"
 
