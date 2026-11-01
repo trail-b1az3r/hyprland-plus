@@ -27,9 +27,9 @@ jobs:
         shell: bash
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
-          RELEASE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
+          RELEASE_SHA="$(git rev-parse HEAD)"
           VERSION="${RELEASE_TAG#v}"
           EXPECTED="$(tr -d '[:space:]' < PLUS_VERSION)"
           if [[ -z "$RELEASE_TAG" ]]; then
