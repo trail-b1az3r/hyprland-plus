@@ -479,6 +479,8 @@ std::vector<SP<IValue>> Values::getConfigValues() {
         MS<Float>("input:tablettool:pressure_range_max",
                   "Set the maximum pressure range for the tool, a negative number will set the default maximum pressure value. This is usually 1.0", -1.0,
                   {.min = -1.0, .max = 1.0, .refresh = Supplementary::REFRESH_INPUT_DEVICES}),
+        MS<String>("input:tablettool:pressure_curve", "Non-linear pressure response for art applications only: linear, soft, firm, or precision.", "linear",
+                   {.validator = strChoice({"linear", "soft", "firm", "precision"}), .refresh = Supplementary::REFRESH_INPUT_DEVICES}),
 
         /*
          * gestures:
