@@ -1,0 +1,24 @@
+# Maintainer: trail-b1az3r contributors
+pkgname=touchd-dkms
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="touchD: DKMS Intel Precise Touch kernel module for Microsoft Surface devices"
+arch=('x86_64' 'aarch64')
+url="https://github.com/linux-surface/intel-precise-touch"
+license=('GPL-2.0-or-later')
+depends=('dkms' 'iptsd')
+makedepends=('git')
+install=touchd.install
+source=("intel-precise-touch::git+https://github.com/linux-surface/intel-precise-touch.git#commit=3b88a45360b4fdab85e2d4389fb4812f5867c1b7")
+sha256sums=('SKIP')
+
+package() {
+  cd "$srcdir/intel-precise-touch"
+  install -d "$pkgdir/usr/src/ipts-$pkgver"
+  cp -a src "$pkgdir/usr/src/ipts-$pkgver/"
+  install -Dm644 Makefile "$pkgdir/usr/src/ipts-$pkgver/Makefile"
+  install -Dm644 dkms.conf "$pkgdir/usr/src/ipts-$pkgver/dkms.conf"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm755 "$srcdir/touchdctl" "$pkgdir/usr/bin/touchdctl"
+  install -Dm644 "$srcdir/iptsd-surface-pro-5.conf" "$pkgdir/usr/share/touchD/iptsd-surface-pro-5.conf"
+}
