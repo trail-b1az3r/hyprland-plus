@@ -211,8 +211,8 @@ a small gold plus above and to the right of the wordmark.
 
 ## Status
 
-The fork builds on Arch from the `halcyon-0.56.2` branch. The drag option and the mini-window click have not been
-tested on a running session yet. Test a drag of a tiled window and a click on a mini window before relying on them.
+The maintained `main` branch is Hyprland 0.57.0.p1. The old `halcyon-0.56.2` branch is retained for older
+installations; new builds should use `main`. The build and live-session feature tests are still the release gate.
 
 # Features
 
@@ -332,3 +332,5 @@ code, are in [CREDITS.md](CREDITS.md).
 [Badge License]: https://img.shields.io/github/license/trail-b1az3r/hyprland-plus
 [Badge Lines]: https://img.shields.io/tokei/lines/github/trail-b1az3r/hyprland-plus
 [Badge Hi Sister]: https://img.shields.io/badge/Hi-sister!-ff69b4
+
+<!----------------------------------{ End }----------------------------------->
