@@ -72,13 +72,17 @@ case "\${1:-}" in
     exec systemctl restart "$unit"
     ;;
   handwriting)
-    if command -v handwrite-input >/dev/null 2>&1; then
-      exec handwrite-input
+    if command -v handwrite-input-client >/dev/null 2>&1 && command -v handwrite-input >/dev/null 2>&1; then
+      if ! pgrep -u "$(id -u)" -f '[h]andwrite-input' >/dev/null 2>&1; then
+        nohup handwrite-input >/dev/null 2>&1 &
+        sleep 0.5
+      fi
+      exec handwrite-input-client show
     elif command -v katip-ink >/dev/null 2>&1; then
       exec katip-ink
     else
       echo "No handwriting overlay is installed."
-      echo "Install handwrite-input or katip-ink, then run touchdctl handwriting."
+      echo "Install handwrite-input (recommended for Hyprland) or katip-ink, then run touchdctl handwriting."
       exit 1
     fi
     ;;
