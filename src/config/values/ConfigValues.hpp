@@ -169,6 +169,8 @@ namespace Config::Values {
         "input:tablettool:pressure_range_min",
         "input:tablettool:pressure_range_max",
         "input:tablettool:pressure_curve",
+        "input:tablettool:pressure_speed",
+        "input:tablettool:pressure_tilt",
         "input:touchpad:flip_x",
         "input:touchpad:flip_y",
         "input:touchpad:drag_3fg",
