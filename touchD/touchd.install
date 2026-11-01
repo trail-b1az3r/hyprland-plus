@@ -1,4 +1,9 @@
 post_install() {
+  # A built-in IPTS driver needs no out-of-tree DKMS copy.
+  if grep -q '^CONFIG_HID_IPTS=y' "/boot/config-$(uname -r)" 2>/dev/null; then
+    echo "touchD: IPTS is built into the running kernel; DKMS build skipped."
+    return 0
+  fi
   # Prefer the in-tree/linux-surface module when the running kernel already ships it.
   local module_path
   module_path="$(modinfo -k "$(uname -r)" -F filename ipts 2>/dev/null || true)"
