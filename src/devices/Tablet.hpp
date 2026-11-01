@@ -209,6 +209,8 @@ class CTabletTool : public IHID {
     Vector2D                    m_absolutePos; // last known absolute position.
     uint32_t                    m_lastMotionTimeMs = 0;
     double                      m_motionSpeed = 0; // normalized tablet-space lengths per second.
+    WP<CWLSurfaceResource>      m_pressureSurface;
+    bool                        m_pressureSurfaceIsArtApp = false;
 
   private:
     CTabletTool(SP<Aquamarine::ITabletTool> tool);
