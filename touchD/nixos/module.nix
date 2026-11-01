@@ -25,9 +25,5 @@ in
     environment.systemPackages = [ touchdctl ];
     environment.etc."iptsd.d/80-touchd-surface-pro-5.conf".source =
       ../iptsd-surface-pro-5.conf;
-    environment.variables = {
-      TOUCHD_PROFILE = "\${../iptsd-surface-pro-5.conf}";
-      TOUCHD_NIXOS_MANAGED = "1";
-    };
   };
 }
