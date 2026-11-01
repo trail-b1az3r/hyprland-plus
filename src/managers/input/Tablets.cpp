@@ -92,6 +92,38 @@ static void refocusTablet(SP<CTablet> tab, SP<CTabletTool> tool, bool motion = f
     PROTO::tablet->motion(tool, local);
 }
 
+static double applyArtPressureCurve(SP<CTabletTool> tool, double pressure) {
+    // Pressure curves are deliberately app-scoped: handwriting, pointer navigation and ordinary UI
+    // keep the hardware's unmodified pressure values. Only known painting applications are adjusted.
+    const auto SURFACE = Desktop::View::CWLSurface::fromResource(g_pSeatManager->m_state.pointerFocus.lock());
+    if (!SURFACE)
+        return pressure;
+
+    const auto WINDOW = Desktop::View::CWindow::fromView(SURFACE->view());
+    if (!WINDOW)
+        return pressure;
+
+    const auto APPID = WINDOW->metadata().appID();
+    const bool IS_ART_APP =
+        APPID.find("krita") != std::string::npos || APPID.find("gimp") != std::string::npos ||
+        APPID.find("inkscape") != std::string::npos || APPID.find("mypaint") != std::string::npos ||
+        APPID.find("blender") != std::string::npos || APPID.find("org.gimp") != std::string::npos;
+    if (!IS_ART_APP)
+        return pressure;
+
+    const auto CURVE = Config::mgr()->getDeviceString(tool->m_hlName, "pressure_curve", "input:tablettool:pressure_curve");
+    const auto P = std::clamp(pressure, 0.0, 1.0);
+
+    if (CURVE == "soft")
+        return std::sqrt(P);
+    if (CURVE == "firm")
+        return P * P;
+    if (CURVE == "precision")
+        return P * P * std::sqrt(P);
+
+    return P;
+}
+
 static Vector2D transformToActiveRegion(const Vector2D pos, const CBox activeArea) {
     auto newPos = pos;
 
@@ -156,7 +188,7 @@ void CInputManager::onTabletAxis(CTablet::SAxisEvent e) {
     }
 
     if (e.updatedAxes & CTablet::eTabletToolAxes::HID_TABLET_TOOL_AXIS_PRESSURE)
-        PROTO::tablet->pressure(PTOOL, e.pressure);
+        PROTO::tablet->pressure(PTOOL, applyArtPressureCurve(PTOOL, e.pressure));
 
     if (e.updatedAxes & CTablet::eTabletToolAxes::HID_TABLET_TOOL_AXIS_DISTANCE)
         PROTO::tablet->distance(PTOOL, e.distance);
