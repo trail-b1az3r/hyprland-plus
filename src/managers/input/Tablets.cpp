@@ -331,6 +331,8 @@ void CInputManager::onTabletProximity(CTablet::SProximityEvent e) {
 
     if (!e.in) {
         m_lastInputTablet = false;
+        PTOOL->m_motionSpeed = 0.0;
+        PTOOL->m_lastMotionTimeMs = 0;
         if (PTOOL->getSurface())
             unfocusTool(PTOOL);
     } else {
