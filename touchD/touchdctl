@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CONFIG=/etc/iptsd.conf
+PROFILE=/usr/share/touchD/iptsd-surface-pro-5.conf
+
+usage() {
+  cat <<'EOF'
+touchdctl — Surface IPTS control utility
+
+  status                 Show IPTS driver, daemon and device status
+  profile surface-pro-5  Back up and install the Surface Pro 5 iptsd profile
+  calibrate              Run iptsd-calibrate (interactive)
+  restart                Restart the detected iptsd service
+  handwriting            Launch an installed Wayland handwriting overlay
+  pen-buttons            Print the Hyprland Plus pen-button configuration guide
+EOF
+}
+
+need_root() {
+  if (( EUID != 0 )); then
+    echo "Run this command with sudo." >&2
+    exit 1
+  fi
+}
+
+case "\${1:-}" in
+  status)
+    echo "Kernel: $(uname -r)"
+    if grep -qE '(^| )ipts( |$)' /proc/modules; then
+      echo "IPTS module: loaded"
+    elif grep -qE '^CONFIG_HID_IPTS=y' "/boot/config-$(uname -r)" 2>/dev/null; then
+      echo "IPTS module: built into kernel"
+    else
+      echo "IPTS module: not loaded (or built in)"
+    fi
+    if command -v iptsd-find-hidraw >/dev/null 2>&1; then
+      iptsd-find-hidraw || true
+    fi
+    if command -v iptsd-find-service >/dev/null 2>&1; then
+      unit=$(iptsd-find-service 2>/dev/null || true)
+      if [[ -n "$unit" ]]; then
+        systemctl --no-pager --full status "$unit" || true
+      else
+        echo "IPTSD service: no matching device service found"
+      fi
+    else
+      echo "IPTSD helpers are missing; install iptsd."
+    fi
+    ;;
+  profile)
+    [[ "\${2:-}" == "surface-pro-5" ]] || { usage; exit 2; }
+    need_root
+    [[ -r "$PROFILE" ]] || { echo "touchD profile missing: $PROFILE" >&2; exit 1; }
+    if [[ -e "$CONFIG" ]]; then
+      cp -a "$CONFIG" "$CONFIG.touchD-backup.$(date +%Y%m%d-%H%M%S)"
+    fi
+    install -Dm644 "$PROFILE" "$CONFIG"
+    echo "Installed Surface Pro 5 IPTSD profile at $CONFIG."
+    echo "Existing config was backed up if it existed. Restart with: sudo touchdctl restart"
+    ;;
+  calibrate)
+    command -v iptsd-calibrate >/dev/null 2>&1 || { echo "iptsd-calibrate is not installed; update iptsd." >&2; exit 1; }
+    echo "Follow the calibration tool prompts."
+    exec iptsd-calibrate
+    ;;
+  restart)
+    need_root
+    command -v iptsd-find-service >/dev/null 2>&1 || { echo "Install iptsd first." >&2; exit 1; }
+    unit=$(iptsd-find-service)
+    [[ -n "$unit" ]] || { echo "No IPTSD service found for the touchscreen." >&2; exit 1; }
+    exec systemctl restart "$unit"
+    ;;
+  handwriting)
+    if command -v handwrite-input >/dev/null 2>&1; then
+      exec handwrite-input
+    elif command -v katip-ink >/dev/null 2>&1; then
+      exec katip-ink
+    else
+      echo "No handwriting overlay is installed."
+      echo "Install handwrite-input or katip-ink, then run touchdctl handwriting."
+      exit 1
+    fi
+    ;;
+  pen-buttons)
+    cat <<'EOF'
+Hyprland Plus pen controls (add to ~/.config/hypr/custom/general.lua):
+
+hl.config({ input = { tablettool = {
+    eraser_button_mode = 1,
+    eraser_button_override = 331 -- BTN_STYLUS; use 332 for BTN_STYLUS2
+} } })
+
+Use hyprctl devices and wev to identify tool names and button codes.
+Other pen buttons remain available to applications.
+EOF
+    ;;
+  -h|--help|"")
+    usage
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac
