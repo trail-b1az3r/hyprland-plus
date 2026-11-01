@@ -45,24 +45,32 @@ profile fits every digitizer.
 Hyprland Plus exposes per-tool eraser button mode, button override, and
 pressure range. Run touchdctl pen-buttons for the configuration guide.
 
-Version 0.57.0.p2 adds an app-scoped pressure curve setting:
+Version 0.57.0.p2 adds app-scoped pressure dynamics:
 
 ~~~ini
 input {
     tablettool {
         pressure_curve = soft # linear, soft, firm, precision
+        pressure_speed = 0.15 # 0–1; 0 disables speed modulation
+        pressure_tilt = 0.10  # 0–1; 0 disables tilt modulation
     }
 }
 ~~~
 
-The curve is applied only while the pen is focused over Krita, GIMP, Inkscape,
-MyPaint or Blender. Other applications receive the unmodified hardware
-pressure.
+These adjustments apply only while the pen is focused over Krita, GIMP,
+Inkscape, MyPaint or Blender. Other applications receive unmodified hardware
+pressure and tilt. Speed is estimated from timestamped tablet-space motion;
+tilt comes from the tablet tool's reported angle.
 
 - linear: unchanged pressure
 - soft: square-root response for lighter strokes
 - firm: squared response for more deliberate strokes
 - precision: steeper response for fine control
+- pressure_speed: up to 25% less pressure response at fast stroke speeds
+- pressure_tilt: up to 15% more pressure response at high pen tilt
+
+Both dynamic controls default to 0 in the compositor. Halcyon opts into
+subtle values; set either to 0 to turn it off.
 
 Pen buttons are delivered by IPTSD/libinput and can also be mapped inside
 individual drawing applications. The touchscreen driver cannot invent
