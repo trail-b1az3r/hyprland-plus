@@ -1,0 +1,18 @@
+post_install() {
+  dkms add -m ipts -v 1.0.0 >/dev/null 2>&1 || true
+  if [[ -d "/lib/modules/$(uname -r)/build" ]]; then
+    dkms install -m ipts -v 1.0.0 -k "$(uname -r)" || {
+      echo "touchD: IPTS DKMS build did not complete. Check kernel headers and linux-surface patches with: dkms status"
+    }
+  else
+    echo "touchD: install matching kernel headers, then run: sudo dkms install -m ipts -v 1.0.0"
+  fi
+}
+
+post_upgrade() {
+  post_install
+}
+
+pre_remove() {
+  dkms remove -m ipts -v 1.0.0 --all >/dev/null 2>&1 || true
+}
