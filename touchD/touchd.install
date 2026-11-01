@@ -12,6 +12,11 @@ post_install() {
     return 0
   fi
 
+  if dkms status -m ipts -v 1.0.0 2>/dev/null | grep -q "installed"; then
+    echo "touchD: IPTS DKMS is already installed for this kernel."
+    return 0
+  fi
+
   dkms add -m ipts -v 1.0.0 >/dev/null 2>&1 || true
   if [[ -d "/lib/modules/$(uname -r)/build" ]]; then
     dkms install -m ipts -v 1.0.0 -k "$(uname -r)" || {
