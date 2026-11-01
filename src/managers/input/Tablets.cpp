@@ -130,7 +130,7 @@ static double applyArtPressureCurve(SP<CTabletTool> tool, double pressure, const
     else if (CURVE == "precision")
         result = P * P * std::sqrt(P);
 
-    // axisDelta is in normalized tablet coordinates. Two screen-widths per second
+    // Tablet absolute coordinates are normalized. Two tablet widths per second
     // saturates the speed factor; the tilt magnitude is expressed in degrees.
     const auto SPEED_FACTOR = std::clamp(speed / 2.0, 0.0, 1.0);
     const auto TILT_FACTOR = std::clamp(std::hypot(tilt.x, tilt.y) / 90.0, 0.0, 1.0);
@@ -177,7 +177,9 @@ void CInputManager::onTabletAxis(CTablet::SAxisEvent e) {
 
         if (PTOOL->m_lastMotionTimeMs != 0 && e.timeMs > PTOOL->m_lastMotionTimeMs) {
             const auto ELAPSED = static_cast<double>(e.timeMs - PTOOL->m_lastMotionTimeMs) / 1000.0;
-            PTOOL->m_motionSpeed = ELAPSED > 0.0 ? std::hypot(delta.x, delta.y) / ELAPSED : 0.0;
+            const auto DX = std::isnan(x) ? 0.0 : x - PTOOL->m_absolutePos.x;
+            const auto DY = std::isnan(y) ? 0.0 : y - PTOOL->m_absolutePos.y;
+            PTOOL->m_motionSpeed = ELAPSED > 0.0 ? std::hypot(DX, DY) / ELAPSED : 0.0;
         } else {
             PTOOL->m_motionSpeed = 0.0;
         }
