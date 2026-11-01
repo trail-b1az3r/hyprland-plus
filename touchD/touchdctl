@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CONFIG=/etc/iptsd.d/80-touchd-surface-pro-5.conf
-PROFILE=/usr/share/touchD/iptsd-surface-pro-5.conf
+CONFIG="${TOUCHD_CONFIG:-/etc/iptsd.d/80-touchd-surface-pro-5.conf}"
+PROFILE="${TOUCHD_PROFILE:-/usr/share/touchD/iptsd-surface-pro-5.conf}"
 
 usage() {
   cat <<'EOF'
@@ -51,6 +51,10 @@ case "\${1:-}" in
   profile)
     [[ "\${2:-}" == "surface-pro-5" ]] || { usage; exit 2; }
     need_root
+    if [[ "${TOUCHD_NIXOS_MANAGED:-0}" == "1" ]]; then
+      echo "NixOS manages this IPTSD profile declaratively. Enable services.touchD in your NixOS configuration instead." >&2
+      exit 1
+    fi
     [[ -r "$PROFILE" ]] || { echo "touchD profile missing: $PROFILE" >&2; exit 1; }
     if [[ -e "$CONFIG" ]]; then
       cp -a "$CONFIG" "$CONFIG.touchD-backup.$(date +%Y%m%d-%H%M%S)"
