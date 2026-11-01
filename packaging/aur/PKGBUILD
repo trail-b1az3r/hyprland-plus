@@ -1,11 +1,11 @@
 # Maintainer: ray0rfire
 # Dependency names come from the CMake lookups in CMakeLists.txt. pacman resolved every name on an Arch install;
-# libeis-1.0 is provided by the libei package, so that is the name here. Run `namcap PKGBUILD` and
-# `makepkg -s` on Arch before publishing.
+# libeis-1.0 is provided by the libei package, so that is the name here. Run namcap PKGBUILD and makepkg -s on Arch
+# before publishing.
 pkgname=hyprland-plus
-pkgver=0.56.2.p2
+pkgver=0.57.0.p1
 pkgrel=1
-pkgdesc="Hyprland 0.56.2 with the Halcyon additions: mini windows, superposition windows, plustile windows and a drag fix"
+pkgdesc="Hyprland 0.57.0 with Halcyon additions: mini, superposition and plustile windows, drag fixes and frame cap"
 arch=('x86_64')
 url="https://github.com/trail-b1az3r/hyprland-plus"
 license=('BSD-3-Clause')
@@ -44,13 +44,12 @@ makedepends=(
 )
 provides=('hyprland')
 conflicts=('hyprland')
-source=("git+https://github.com/trail-b1az3r/hyprland-plus.git#branch=halcyon-0.56.2")
+source=("git+https://github.com/trail-b1az3r/hyprland-plus.git#branch=main")
 sha256sums=('SKIP')
 
 prepare() {
   cd "$pkgname"
-  # udis86 and hyprland-protocols are git submodules, and CMake builds udis86 from its
-  # submodule when no system copy is found. makepkg does not fetch submodules by itself.
+  # udis86 and hyprland-protocols are git submodules and makepkg does not fetch them by itself.
   git submodule update --init --recursive
 }
 
