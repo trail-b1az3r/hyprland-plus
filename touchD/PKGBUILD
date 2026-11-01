@@ -9,8 +9,9 @@ license=('GPL-2.0-or-later')
 depends=('dkms' 'iptsd')
 makedepends=('git')
 install=touchd.install
-source=("intel-precise-touch::git+https://github.com/linux-surface/intel-precise-touch.git#commit=3b88a45360b4fdab85e2d4389fb4812f5867c1b7")
-sha256sums=('SKIP')
+source=("intel-precise-touch::git+https://github.com/linux-surface/intel-precise-touch.git#commit=3b88a45360b4fdab85e2d4389fb4812f5867c1b7"
+        "touchdctl" "iptsd-surface-pro-5.conf")
+sha256sums=('SKIP' 'SKIP' 'SKIP')
 
 package() {
   cd "$srcdir/intel-precise-touch"
