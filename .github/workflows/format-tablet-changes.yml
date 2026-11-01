@@ -1,0 +1,54 @@
+name: Format tablet changes
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: format-tablet-changes
+  cancel-in-progress: true
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install clang-format
+        run: |
+          pacman -Syu --noconfirm --needed clang
+
+      - name: Format tablet implementation and tests
+        run: |
+          clang-format -i \
+            src/managers/input/Tablets.cpp \
+            src/devices/Tablet.hpp \
+            tests/config/BlurVariants.cpp
+
+      - name: Commit formatting fixes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "The tablet files are already formatted."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            src/managers/input/Tablets.cpp \
+            src/devices/Tablet.hpp \
+            tests/config/BlurVariants.cpp
+          git commit -m "style(tablet): apply clang-format"
+          git push origin HEAD:main
