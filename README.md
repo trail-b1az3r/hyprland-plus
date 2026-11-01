@@ -172,6 +172,23 @@ hl.bind("SUPER + ALT + Right", hl.dsp.window.resize_edge({ edge = "right", amoun
 Source: `plustile` in `src/desktop/rule/windowRule/`, `resizeEdge` in `src/config/shared/actions/ConfigActions.cpp`,
 and `hl.dsp.window.resize_edge` in `src/config/lua/bindings/LuaBindingsDispatchers.cpp`.
 
+## New in 0.57.0.p2
+
+- **touchD Surface input integration**: the new `touchD/` directory packages the upstream Intel Precise Touch
+  kernel module for DKMS, a Surface Pro 5 IPTSD profile, calibration/status controls and pen-button guidance.
+  It uses the linux-surface driver and IPTSD rather than a parallel input stack.
+- **App-scoped pen pressure curves**: `input:tablettool:pressure_curve` accepts `linear`, `soft`, `firm` or
+  `precision`. Non-linear curves are applied only when the pen is over Krita, GIMP, Inkscape, MyPaint or Blender;
+  other applications receive the original pressure values. The default is `linear`.
+- **Touch processing**: the Surface Pro 5 profile adjusts IPTSD contact size, aspect and position stability bounds,
+  palm classification and the DFT button magnitude threshold. Run `sudo touchdctl calibrate` to tune it to the
+  actual digitizer and fingers.
+- **Handwriting overlay launch**: `touchdctl handwriting` launches an installed `handwrite-input` or `katip-ink`
+  Wayland recognizer. Recognition remains outside the compositor's input and rendering loops.
+
+See [touchD](touchD/README.md) for kernel prerequisites, setup and limits. IPTS DKMS requires the relevant kernel
+patches; on a kernel with IPTS built in, the DKMS module is unnecessary.
+
 ## New in 0.57.0.p1
 
 - **Based on Hyprland 0.57.0.** Every hyprland-plus addition carried over. Upstream 0.57 now keeps the grab point
@@ -204,7 +221,7 @@ See [Desk](docs/wiki/content/hyprland-plus/desk.md) and [Mini windows](docs/wiki
 
 ## Version string
 
-`hyprland --version` reports `hyprland-plus 0.57.0.p1`, from the `PLUS_VERSION` file. The fork is based on upstream
+`hyprland --version` reports `hyprland-plus 0.57.0.p2`, from the `PLUS_VERSION` file. The fork is based on upstream
 0.57.0, and `VERSION` keeps the numeric version that CMake needs. The binary and the config directory names are
 unchanged, so existing configs and session files keep working.
 
@@ -215,7 +232,7 @@ a small gold plus above and to the right of the wordmark.
 
 ## Status
 
-The maintained `main` branch is Hyprland 0.57.0.p1. The old `halcyon-0.56.2` branch is retained for older
+The maintained `main` branch is Hyprland 0.57.0.p2. The old `halcyon-0.56.2` branch is retained for older
 installations; new builds should use `main`. The build and live-session feature tests are still the release gate.
 
 # Features
