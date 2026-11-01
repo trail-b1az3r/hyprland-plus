@@ -253,3 +253,24 @@ TEST(Config, fluidJarSettingsAreBounded) {
         EXPECT_EQ(FLOAT_VALUE->refreshBits(), Config::Supplementary::REFRESH_BLUR_FB);
     }
 }
+
+TEST(Config, tabletPressureCurvePresetsAreValidated) {
+    const auto VALUE = std::ranges::find_if(CONFIG_VALUES, [](const auto& value) {
+        return std::string_view{value->name()} == "input:tablettool:pressure_curve";
+    });
+    ASSERT_NE(VALUE, CONFIG_VALUES.end());
+
+    const auto STRING_VALUE = dynamicPointerCast<CStringValue>(*VALUE);
+    ASSERT_TRUE(STRING_VALUE);
+    EXPECT_EQ(STRING_VALUE->defaultVal(), "linear");
+
+    const auto VALIDATOR = STRING_VALUE->validator();
+    ASSERT_TRUE(VALIDATOR);
+    EXPECT_TRUE(VALIDATOR("linear").has_value());
+    EXPECT_TRUE(VALIDATOR("soft").has_value());
+    EXPECT_TRUE(VALIDATOR("firm").has_value());
+    EXPECT_TRUE(VALIDATOR("precision").has_value());
+    EXPECT_FALSE(VALIDATOR("aggressive").has_value());
+
+    EXPECT_TRUE(std::ranges::contains(CONFIG_DEVICE_VALUE_NAMES, "input:tablettool:pressure_curve"));
+}
