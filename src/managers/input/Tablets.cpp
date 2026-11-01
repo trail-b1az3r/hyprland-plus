@@ -96,9 +96,9 @@ static void refocusTablet(SP<CTablet> tab, SP<CTabletTool> tool, bool motion = f
     PROTO::tablet->motion(tool, local);
 }
 
-static double applyArtPressureCurve(SP<CTabletTool> tool, double pressure) {
-    // Pressure curves are deliberately app-scoped: handwriting, pointer navigation and ordinary UI
-    // keep the hardware's unmodified pressure values. Only known painting applications are adjusted.
+static double applyArtPressureCurve(SP<CTabletTool> tool, double pressure, const Vector2D& tilt, double speed) {
+    // Pressure curves and dynamics are deliberately app-scoped: handwriting, pointer navigation
+    // and ordinary UI keep the hardware's unmodified pressure values.
     const auto SURFACE = Desktop::View::CWLSurface::fromResource(g_pSeatManager->m_state.pointerFocus.lock());
     if (!SURFACE)
         return pressure;
@@ -111,21 +111,32 @@ static double applyArtPressureCurve(SP<CTabletTool> tool, double pressure) {
     const bool IS_ART_APP =
         APPID.find("krita") != std::string::npos || APPID.find("gimp") != std::string::npos ||
         APPID.find("inkscape") != std::string::npos || APPID.find("mypaint") != std::string::npos ||
-        APPID.find("blender") != std::string::npos || APPID.find("org.gimp") != std::string::npos;
+        APPID.find("blender") != std::string::npos;
     if (!IS_ART_APP)
         return pressure;
 
     const auto CURVE = Config::mgr()->getDeviceString(tool->m_hlName, "pressure_curve", "input:tablettool:pressure_curve");
+    const auto SPEED_SENSITIVITY = std::clamp(
+        Config::mgr()->getDeviceFloat(tool->m_hlName, "pressure_speed", "input:tablettool:pressure_speed"), 0.F, 1.F);
+    const auto TILT_SENSITIVITY = std::clamp(
+        Config::mgr()->getDeviceFloat(tool->m_hlName, "pressure_tilt", "input:tablettool:pressure_tilt"), 0.F, 1.F);
     const auto P = std::clamp(pressure, 0.0, 1.0);
 
+    double result = P;
     if (CURVE == "soft")
-        return std::sqrt(P);
-    if (CURVE == "firm")
-        return P * P;
-    if (CURVE == "precision")
-        return P * P * std::sqrt(P);
+        result = std::sqrt(P);
+    else if (CURVE == "firm")
+        result = P * P;
+    else if (CURVE == "precision")
+        result = P * P * std::sqrt(P);
 
-    return P;
+    // axisDelta is in normalized tablet coordinates. Two screen-widths per second
+    // saturates the speed factor; the tilt magnitude is expressed in degrees.
+    const auto SPEED_FACTOR = std::clamp(speed / 2.0, 0.0, 1.0);
+    const auto TILT_FACTOR = std::clamp(std::hypot(tilt.x, tilt.y) / 90.0, 0.0, 1.0);
+    result *= 1.0 - (0.25 * SPEED_SENSITIVITY * SPEED_FACTOR);
+    result *= 1.0 + (0.15 * TILT_SENSITIVITY * TILT_FACTOR);
+    return std::clamp(result, 0.0, 1.0);
 }
 
 static Vector2D transformToActiveRegion(const Vector2D pos, const CBox activeArea) {
@@ -164,6 +175,14 @@ void CInputManager::onTabletAxis(CTablet::SAxisEvent e) {
 
         Vector2D delta = {std::isnan(dx) ? 0.0 : dx, std::isnan(dy) ? 0.0 : dy};
 
+        if (PTOOL->m_lastMotionTimeMs != 0 && e.timeMs > PTOOL->m_lastMotionTimeMs) {
+            const auto ELAPSED = static_cast<double>(e.timeMs - PTOOL->m_lastMotionTimeMs) / 1000.0;
+            PTOOL->m_motionSpeed = ELAPSED > 0.0 ? std::hypot(delta.x, delta.y) / ELAPSED : 0.0;
+        } else {
+            PTOOL->m_motionSpeed = 0.0;
+        }
+        PTOOL->m_lastMotionTimeMs = e.timeMs;
+
         switch (e.tool->type) {
             case Aquamarine::ITabletTool::AQ_TABLET_TOOL_TYPE_MOUSE: {
                 Pointer::mgr()->move(delta);
@@ -191,8 +210,14 @@ void CInputManager::onTabletAxis(CTablet::SAxisEvent e) {
         m_lastCursorMovement.reset();
     }
 
+    if (e.updatedAxes & CTablet::eTabletToolAxes::HID_TABLET_TOOL_AXIS_TILT_X)
+        PTOOL->m_tilt.x = e.tilt.x;
+
+    if (e.updatedAxes & CTablet::eTabletToolAxes::HID_TABLET_TOOL_AXIS_TILT_Y)
+        PTOOL->m_tilt.y = e.tilt.y;
+
     if (e.updatedAxes & CTablet::eTabletToolAxes::HID_TABLET_TOOL_AXIS_PRESSURE)
-        PROTO::tablet->pressure(PTOOL, applyArtPressureCurve(PTOOL, e.pressure));
+        PROTO::tablet->pressure(PTOOL, applyArtPressureCurve(PTOOL, e.pressure, PTOOL->m_tilt, PTOOL->m_motionSpeed));
 
     if (e.updatedAxes & CTablet::eTabletToolAxes::HID_TABLET_TOOL_AXIS_DISTANCE)
         PROTO::tablet->distance(PTOOL, e.distance);
@@ -205,12 +230,6 @@ void CInputManager::onTabletAxis(CTablet::SAxisEvent e) {
 
     if (e.updatedAxes & CTablet::eTabletToolAxes::HID_TABLET_TOOL_AXIS_WHEEL)
         PROTO::tablet->wheel(PTOOL, e.wheelDelta);
-
-    if (e.updatedAxes & CTablet::eTabletToolAxes::HID_TABLET_TOOL_AXIS_TILT_X)
-        PTOOL->m_tilt.x = e.tilt.x;
-
-    if (e.updatedAxes & CTablet::eTabletToolAxes::HID_TABLET_TOOL_AXIS_TILT_Y)
-        PTOOL->m_tilt.y = e.tilt.y;
 
     if (e.updatedAxes & (CTablet::eTabletToolAxes::HID_TABLET_TOOL_AXIS_TILT_X | CTablet::eTabletToolAxes::HID_TABLET_TOOL_AXIS_TILT_Y))
         PROTO::tablet->tilt(PTOOL, PTOOL->m_tilt);
@@ -290,6 +309,8 @@ void CInputManager::onTabletProximity(CTablet::SProximityEvent e) {
                 unfocusTool(PTOOL);
             PTOOL->m_active = false;
             PTOOL->m_isDown = false;
+            PTOOL->m_motionSpeed = 0.0;
+            PTOOL->m_lastMotionTimeMs = 0;
             PTOOL->m_buttonsDown.clear();
             m_lastInputTablet = false;
         }
