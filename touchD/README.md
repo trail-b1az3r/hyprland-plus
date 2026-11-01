@@ -92,6 +92,20 @@ the first recognition downloads model weights. Its recognition runs on a
 worker thread outside Hyprland's input/render loops so model inference does
 not block compositor input handling.
 
+### NixOS
+
+handwrite-input ships a NixOS module. Add the flake input:
+
+~~~nix
+inputs.handwrite-input.url = "git+https://gitea.edley.me/petere/handwrite-input.git";
+~~~
+
+Import `inputs.handwrite-input.nixosModules.handwrite-input` in the system
+configuration and enable `services.handwrite-input.enable = true;`. Add the
+desktop user to `services.handwrite-input.users`, then log in again so
+ydotool group membership takes effect. The overlay can then be opened with
+`touchdctl handwriting` or `handwrite-input-client show`.
+
 ## Responsiveness and failure handling
 
 - The IPTS kernel module and iptsd remain the only hardware event path.
