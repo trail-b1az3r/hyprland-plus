@@ -13,8 +13,8 @@ maintained `PKGBUILD` and the release workflow.
 4. On an Arch Linux machine with `base-devel` and `git` installed:
 
    ```sh
-   git clone https://github.com/trail-b1az3r/hyprland-plus.git
-   cd hyprland-plus/packaging/aur
+   git clone https://github.com/trail-b1az3r/hyprland-plus.git ~/src/hyprland-plus
+   cd ~/src/hyprland-plus/packaging/aur
    makepkg --printsrcinfo > .SRCINFO
    namcap PKGBUILD
    makepkg -s
@@ -24,9 +24,9 @@ maintained `PKGBUILD` and the release workflow.
    then make the initial AUR commit and push:
 
    ```sh
-   git clone ssh://aur@aur.archlinux.org/hyprland-plus.git
-   cp PKGBUILD .SRCINFO hyprland-plus/
-   cd hyprland-plus
+   git clone ssh://aur@aur.archlinux.org/hyprland-plus.git ~/src/hyprland-plus-aur
+   cp PKGBUILD .SRCINFO ~/src/hyprland-plus-aur/
+   cd ~/src/hyprland-plus-aur
    git config user.name "Your AUR username"
    git config user.email "your verified email"
    git add PKGBUILD .SRCINFO
@@ -34,8 +34,7 @@ maintained `PKGBUILD` and the release workflow.
    git push origin master
    ```
 
-   Run the copy commands from the directory containing the generated files; adjust
-   the source path if your clone is elsewhere.
+
 
 ## Automatic release publishing
 
