@@ -33,12 +33,20 @@ sudo touchdctl restart
 touchdctl status
 ~~~
 
-The profile tunes contact size/aspect bounds for angled finger contacts,
-enables IPTSD palm classification, preserves finger input while the pen is
-hovering, and raises the DFT pen-button magnitude threshold to reduce
-accidental button events. Run sudo touchdctl calibrate to measure contact
-bounds for your own fingers; calibration is preferable to assuming one
-profile fits every digitizer.
+The profile is installed as
+`/etc/iptsd.d/80-touchd-surface-pro-5.conf`, leaving your main
+`/etc/iptsd.conf` intact. It tunes contact size/aspect bounds for angled
+finger contacts, enables IPTSD palm classification, preserves finger input
+while the pen is hovering, and raises the DFT pen-button magnitude threshold
+to reduce accidental button events.
+
+Run `sudo touchdctl calibrate` to stop the detected IPTSD service, find the
+touchscreen's hidraw device, and launch the upstream calibration tool. Touch
+each finger lightly and firmly, then test multi-finger gestures; avoid resting
+your palm on the display during calibration. The command restarts IPTSD on
+exit. Copy the final `SizeMin`, `SizeMax`, `AspectMin` and `AspectMax`
+values into `/etc/iptsd.d/90-calibration.conf` under `[Contacts]`. This
+later drop-in overrides the broad defaults in the touchD profile.
 
 ## Pen controls and pressure
 
