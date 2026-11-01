@@ -180,6 +180,10 @@ and `hl.dsp.window.resize_edge` in `src/config/lua/bindings/LuaBindingsDispatche
 - **Frame cap**: `plus:max_fps` draws each monitor at most that many times a second (0, the default, is no limit).
   Frames asked for sooner wait for their turn and then show everything that changed. Halcyon's super battery saver
   sets 12.
+- **Renderer features from upstream 0.57.0**: motion blur (`decoration:motion_blur`), proportional blur
+  (`decoration:blur:proportional`), selectable blur variants (`decoration:blur:variant`), wobble deformation
+  (`decoration:wobble`) and glow (`decoration:glow`) are present in this fork. Halcyon enables them only when the
+  running build reports support, and Super Saver disables the animated effects.
 
 ## New in 0.56.2.p2
 
