@@ -168,6 +168,7 @@ namespace Config::Values {
         "input:tablettool:eraser_button_override",
         "input:tablettool:pressure_range_min",
         "input:tablettool:pressure_range_max",
+        "input:tablettool:pressure_curve",
         "input:touchpad:flip_x",
         "input:touchpad:flip_y",
         "input:touchpad:drag_3fg",
