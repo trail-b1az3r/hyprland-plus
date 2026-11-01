@@ -1,0 +1,92 @@
+name: Publish hyprland-plus to AUR
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aur-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Update AUR package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the released source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.release.tag_name || github.sha }}
+          fetch-depth: 0
+
+      - name: Validate release version and prepare PKGBUILD
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          VERSION="${RELEASE_TAG#v}"
+          EXPECTED="$(tr -d '[:space:]' < PLUS_VERSION)"
+          if [[ -z "$RELEASE_TAG" ]]; then
+            VERSION="$EXPECTED"
+          fi
+          if [[ "$VERSION" != "$EXPECTED" ]]; then
+            echo "::error::Release tag ($VERSION) does not match PLUS_VERSION ($EXPECTED)."
+            exit 1
+          fi
+          [[ "$VERSION" =~ ^[0-9]+([.][A-Za-z0-9]+)*$ ]] || {
+            echo "::error::Invalid Arch pkgver: $VERSION"
+            exit 1
+          }
+          sed -i -E "s/^pkgver=.*/pkgver=$VERSION/" packaging/aur/PKGBUILD
+          sed -i -E "s|(hyprland-plus::git\\+https://github.com/trail-b1az3r/hyprland-plus.git#commit=)[0-9a-f]+|\\1$RELEASE_SHA|" packaging/aur/PKGBUILD
+          grep -q "commit=$RELEASE_SHA" packaging/aur/PKGBUILD
+          mkdir -p "$RUNNER_TEMP/aur-package"
+          cp packaging/aur/PKGBUILD "$RUNNER_TEMP/aur-package/PKGBUILD"
+
+      - name: Generate .SRCINFO with makepkg
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "$RUNNER_TEMP/aur-package:/pkg" \
+            -w /pkg \
+            archlinux:base-devel \
+            bash -euc 'useradd -m builder; chown -R builder:builder /pkg; su builder -c "makepkg --printsrcinfo > /pkg/.SRCINFO"'
+          test -s "$RUNNER_TEMP/aur-package/.SRCINFO"
+
+      - name: Publish to the AUR
+        shell: bash
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          AUR_COMMIT_EMAIL: ${{ secrets.AUR_COMMIT_EMAIL }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${AUR_SSH_PRIVATE_KEY:-}" || -z "${AUR_COMMIT_EMAIL:-}" ]]; then
+            echo "::error::Configure AUR_SSH_PRIVATE_KEY and AUR_COMMIT_EMAIL repository secrets."
+            exit 1
+          fi
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/aur
+          chmod 600 ~/.ssh/aur
+          ssh-keyscan -t ed25519 aur.archlinux.org >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/aur -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes"
+          git clone ssh://aur@aur.archlinux.org/hyprland-plus.git "$RUNNER_TEMP/aur-repo"
+          cp "$RUNNER_TEMP/aur-package/PKGBUILD" "$RUNNER_TEMP/aur-repo/PKGBUILD"
+          cp "$RUNNER_TEMP/aur-package/.SRCINFO" "$RUNNER_TEMP/aur-repo/.SRCINFO"
+          cd "$RUNNER_TEMP/aur-repo"
+          git config user.name "Hyprland Plus Release Bot"
+          git config user.email "$AUR_COMMIT_EMAIL"
+          if git diff --quiet; then
+            echo "AUR package is already up to date."
+            exit 0
+          fi
+          git add PKGBUILD .SRCINFO
+          git commit -m "Update hyprland-plus to $VERSION"
+          git push origin master
