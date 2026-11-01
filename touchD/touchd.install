@@ -1,4 +1,12 @@
 post_install() {
+  # Prefer the in-tree/linux-surface module when the running kernel already ships it.
+  local module_path
+  module_path="$(modinfo -k "$(uname -r)" -F filename ipts 2>/dev/null || true)"
+  if [[ -n "$module_path" && "$module_path" == *"/kernel/"* ]]; then
+    echo "touchD: using the kernel-provided IPTS module ($module_path); DKMS build skipped."
+    return 0
+  fi
+
   dkms add -m ipts -v 1.0.0 >/dev/null 2>&1 || true
   if [[ -d "/lib/modules/$(uname -r)/build" ]]; then
     dkms install -m ipts -v 1.0.0 -k "$(uname -r)" || {
