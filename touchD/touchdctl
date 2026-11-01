@@ -37,15 +37,10 @@ case "\${1:-}" in
     if command -v iptsd-find-hidraw >/dev/null 2>&1; then
       iptsd-find-hidraw || true
     fi
-    if command -v iptsd-find-service >/dev/null 2>&1; then
-      unit=$(iptsd-find-service 2>/dev/null || true)
-      if [[ -n "$unit" ]]; then
-        systemctl --no-pager --full status "$unit" || true
-      else
-        echo "IPTSD service: no matching device service found"
-      fi
+    if command -v iptsd-systemd >/dev/null 2>&1; then
+      iptsd-systemd -t touchscreen -i 0 -- --no-pager --full status || true
     else
-      echo "IPTSD helpers are missing; install iptsd."
+      echo "iptsd-systemd is missing; update iptsd."
     fi
     ;;
   profile)
@@ -66,14 +61,13 @@ case "\${1:-}" in
   calibrate)
     need_root
     command -v iptsd-calibrate >/dev/null 2>&1 || { echo "iptsd-calibrate is not installed; update iptsd." >&2; exit 1; }
-    command -v iptsd-find-hidraw >/dev/null 2>&1 || { echo "iptsd-find-hidraw is not installed; update iptsd." >&2; exit 1; }
-    command -v iptsd-find-service >/dev/null 2>&1 || { echo "iptsd-find-service is not installed; update iptsd." >&2; exit 1; }
-    unit=$(iptsd-find-service)
-    device=$(iptsd-find-hidraw)
-    [[ -n "$unit" && -n "$device" ]] || { echo "Could not identify the IPTS service or touchscreen hidraw device." >&2; exit 1; }
-    echo "Stop $unit while collecting calibration samples from $device."
-    systemctl stop "$unit"
-    restart_iptsd() { systemctl start "$unit" || true; }
+    command -v iptsd-foreach >/dev/null 2>&1 || { echo "iptsd-foreach is not installed; update iptsd." >&2; exit 1; }
+    command -v iptsd-systemd >/dev/null 2>&1 || { echo "iptsd-systemd is not installed; update iptsd." >&2; exit 1; }
+    device=$(iptsd-foreach -t touchscreen -i 0 -- echo {})
+    [[ -n "$device" ]] || { echo "Could not identify the IPTS touchscreen hidraw device." >&2; exit 1; }
+    echo "Stop the IPTS touchscreen service while collecting samples from $device."
+    iptsd-systemd -t touchscreen -i 0 -- stop
+    restart_iptsd() { iptsd-systemd -t touchscreen -i 0 -- start || true; }
     trap restart_iptsd EXIT
     iptsd-calibrate "$device"
     echo
@@ -83,10 +77,8 @@ case "\${1:-}" in
     ;;
   restart)
     need_root
-    command -v iptsd-find-service >/dev/null 2>&1 || { echo "Install iptsd first." >&2; exit 1; }
-    unit=$(iptsd-find-service)
-    [[ -n "$unit" ]] || { echo "No IPTSD service found for the touchscreen." >&2; exit 1; }
-    exec systemctl restart "$unit"
+    command -v iptsd-systemd >/dev/null 2>&1 || { echo "Update iptsd to get iptsd-systemd." >&2; exit 1; }
+    exec iptsd-systemd -t touchscreen -i 0 -- restart
     ;;
   handwriting)
     if command -v handwrite-input-client >/dev/null 2>&1 && command -v handwrite-input >/dev/null 2>&1; then
