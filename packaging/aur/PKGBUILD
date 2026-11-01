@@ -3,6 +3,7 @@
 pkgname=hyprland-plus
 pkgver=0.57.0.p1
 pkgrel=1
+_udis86=5336633af70f3917760a6d441ff02d93477b0c86
 pkgdesc="Hyprland 0.57.0 with Halcyon additions: mini, superposition and plustile windows, drag fixes and frame cap"
 arch=('x86_64')
 url="https://github.com/trail-b1az3r/hyprland-plus"
@@ -24,17 +25,20 @@ optdepends=(
 provides=("hyprland=${pkgver%.p*}" wayland-compositor)
 conflicts=('hyprland')
 source=(
-  "git+https://github.com/trail-b1az3r/hyprland-plus.git#commit=e5d85f53a40b16ecc83f09260bf585f657effa69"
+  "hyprland-plus::git+https://github.com/trail-b1az3r/hyprland-plus.git#commit=e5d85f53a40b16ecc83f09260bf585f657effa69"
+  "udis86::git+https://github.com/canihavesomecoffee/udis86.git#commit=${_udis86}"
 )
-sha256sums=('SKIP')
+sha256sums=('SKIP' 'SKIP')
 
 prepare() {
-  cd "$pkgname"
-  git submodule update --init --recursive
+  cd hyprland-plus
+  git submodule init subprojects/udis86
+  git config submodule.subprojects/udis86.url "$srcdir/udis86"
+  git -c protocol.file.allow=always submodule update subprojects/udis86
 }
 
 build() {
-  cd "$pkgname"
+  cd hyprland-plus
   cmake -B build -S . \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=/usr \
