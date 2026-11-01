@@ -8,8 +8,8 @@ maintained `PKGBUILD` and the release workflow.
 
 1. Create an account at https://aur.archlinux.org/ if you do not already have one.
 2. Add an SSH public key under **My Account → SSH Public Keys**.
-3. Open https://aur.archlinux.org/packages/hyprland-plus and choose **Submit** to register
-   the package name. The first push must be made manually.
+3. The package is created by the first successful push to its empty AUR Git
+   repository. The first push must be made manually; subsequent releases are automated.
 4. On an Arch Linux machine with `base-devel` and `git` installed:
 
    ```sh
