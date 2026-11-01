@@ -8,6 +8,9 @@
 #include "../../protocols/core/DataDevice.hpp"
 #include "../../event/EventBus.hpp"
 
+#include <algorithm>
+#include <cmath>
+
 static void unfocusTool(SP<CTabletTool> tool) {
     if (!tool->getSurface())
         return;
