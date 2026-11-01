@@ -177,9 +177,10 @@ and `hl.dsp.window.resize_edge` in `src/config/lua/bindings/LuaBindingsDispatche
 - **touchD Surface input integration**: the new `touchD/` directory packages the upstream Intel Precise Touch
   kernel module for DKMS, a Surface Pro 5 IPTSD profile, calibration/status controls and pen-button guidance.
   It uses the linux-surface driver and IPTSD rather than a parallel input stack.
-- **App-scoped pen pressure curves**: `input:tablettool:pressure_curve` accepts `linear`, `soft`, `firm` or
-  `precision`. Non-linear curves are applied only when the pen is over Krita, GIMP, Inkscape, MyPaint or Blender;
-  other applications receive the original pressure values. The default is `linear`.
+- **App-scoped pen pressure dynamics**: `input:tablettool:pressure_curve` accepts `linear`, `soft`, `firm` or
+  `precision`; `pressure_speed` and `pressure_tilt` tune speed- and angle-based modulation from 0 (off) to 1.
+  Non-linear curves and dynamics are applied only when the pen is over Krita, GIMP, Inkscape, MyPaint or Blender;
+  other applications receive the original pressure and tilt values. All three controls default to neutral.
 - **Touch processing**: the Surface Pro 5 profile adjusts IPTSD contact size, aspect and position stability bounds,
   palm classification and the DFT button magnitude threshold. Run `sudo touchdctl calibrate` to tune it to the
   actual digitizer and fingers.
