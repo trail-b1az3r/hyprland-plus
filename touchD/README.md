@@ -102,17 +102,52 @@ not block compositor input handling.
 
 ### NixOS
 
-handwrite-input ships a NixOS module. Add the flake input:
+Do not install the Arch DKMS package on NixOS. Use the Surface Pro Intel
+module from nixos-hardware, which selects the patched Surface kernel and
+enables IPTS support. Add these flake inputs:
 
 ~~~nix
+inputs.nixos-hardware.url = "github:NixOS/nixos-hardware";
 inputs.handwrite-input.url = "git+https://gitea.edley.me/petere/handwrite-input.git";
 ~~~
 
-Import `inputs.handwrite-input.nixosModules.handwrite-input` in the system
-configuration and enable `services.handwrite-input.enable = true;`. Add the
-desktop user to `services.handwrite-input.users`, then log in again so
-ydotool group membership takes effect. The overlay can then be opened with
-`touchdctl handwriting` or `handwrite-input-client show`.
+Import the modules in your NixOS configuration:
+
+~~~nix
+imports = [
+  inputs.nixos-hardware.nixosModules.microsoft-surface-pro-intel
+  inputs.handwrite-input.nixosModules.handwrite-input
+  /path/to/hyprland-plus/touchD/nixos/module.nix
+];
+
+services.iptsd.enable = true;
+services.touchD.enable = true;
+services.handwrite-input.enable = true;
+services.handwrite-input.users = [ "your-user" ];
+~~~
+
+The touchD module adds the Surface Pro 5 IPTSD drop-in and the `touchdctl`
+utility. The Surface Pro Intel module supplies the patched kernel and
+IPTSD service; no DKMS module is needed when the kernel already includes IPTS.
+The handwriting module provides the TrOCR overlay. Log in again after adding
+the user so ydotool group membership takes effect.
+
+On NixOS, `touchdctl profile surface-pro-5` is intentionally disabled because
+`/etc` is generated declaratively. Enable `services.touchD` instead. After
+calibration, put the measured values in your NixOS configuration:
+
+~~~nix
+environment.etc."iptsd.d/90-calibration.conf".text = ''
+  [Contacts]
+  SizeMin = 0.42
+  SizeMax = 0.86
+  AspectMin = 1.02
+  AspectMax = 2.32
+'';
+~~~
+
+Replace those example values with the measurements printed by
+`sudo touchdctl calibrate`, then rebuild the system.
 
 ## Responsiveness and failure handling
 
