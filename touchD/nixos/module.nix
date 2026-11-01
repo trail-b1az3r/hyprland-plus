@@ -10,7 +10,11 @@ let
       procps
       systemd
     ];
-    text = builtins.readFile ../touchdctl;
+    text = ''
+      export TOUCHD_PROFILE="${../iptsd-surface-pro-5.conf}"
+      export TOUCHD_NIXOS_MANAGED=1
+      ${builtins.readFile ../touchdctl}
+    '';
   };
 in
 {
