@@ -78,11 +78,19 @@ physical buttons that the pen does not report.
 
 ## Handwriting to text
 
-touchD exposes touchdctl handwriting as a launcher for an installed Wayland
-handwriting overlay. It detects handwrite-input or katip-ink. These are
-optional recognition frontends, not kernel modules; they can use large local
-ML models and may need model downloads. They run outside Hyprland's
-input/render loops so recognition work does not stall compositor input.
+touchD exposes touchdctl handwriting as a launcher for an installed
+Wayland handwriting overlay. The recommended Hyprland frontend is
+[handwrite-input](https://gitea.edley.me/petere/handwrite-input): touchdctl
+starts its daemon if needed, then opens its overlay with
+handwrite-input-client. It uses TrOCR for local handwriting recognition and
+types the result into the focused application. katip-ink is also detected as
+an optional fallback.
+
+These are optional recognition frontends, not kernel modules. handwrite-input
+requires GTK3, gtk-layer-shell, PyTorch, Transformers and ydotool or wtype;
+the first recognition downloads model weights. Its recognition runs on a
+worker thread outside Hyprland's input/render loops so model inference does
+not block compositor input handling.
 
 ## Responsiveness and failure handling
 
