@@ -96,7 +96,7 @@ static void refocusTablet(SP<CTablet> tab, SP<CTabletTool> tool, bool motion = f
     PROTO::tablet->motion(tool, local);
 }
 
-static double applyArtPressureCurve(SP<CTabletTool> tool, double pressure, const Vector2D& tilt, double speed) {
+static double applyArtPressureCurve(SP<CTabletTool> tool, double pressure, const Vector2D& tilt, double speed, uint32_t timeMs) {
     // Pressure curves and dynamics are deliberately app-scoped: handwriting, pointer navigation
     // and ordinary UI keep the hardware's unmodified pressure values. Cache the target app because
     // this function runs on every pressure event.
@@ -139,7 +139,8 @@ static double applyArtPressureCurve(SP<CTabletTool> tool, double pressure, const
 
     // Tablet absolute coordinates are normalized. Two tablet widths per second
     // saturates the speed factor; the tilt magnitude is expressed in degrees.
-    const auto SPEED_FACTOR = std::clamp(speed / 2.0, 0.0, 1.0);
+    const auto FRESH_SPEED = timeMs >= tool->m_lastMotionTimeMs && timeMs - tool->m_lastMotionTimeMs <= 100 ? speed : 0.0;
+    const auto SPEED_FACTOR = std::clamp(FRESH_SPEED / 2.0, 0.0, 1.0);
     const auto TILT_FACTOR = std::clamp(std::hypot(tilt.x, tilt.y) / 90.0, 0.0, 1.0);
     result *= 1.0 - (0.25 * SPEED_SENSITIVITY * SPEED_FACTOR);
     result *= 1.0 + (0.15 * TILT_SENSITIVITY * TILT_FACTOR);
@@ -226,7 +227,7 @@ void CInputManager::onTabletAxis(CTablet::SAxisEvent e) {
         PTOOL->m_tilt.y = e.tilt.y;
 
     if (e.updatedAxes & CTablet::eTabletToolAxes::HID_TABLET_TOOL_AXIS_PRESSURE)
-        PROTO::tablet->pressure(PTOOL, applyArtPressureCurve(PTOOL, e.pressure, PTOOL->m_tilt, PTOOL->m_motionSpeed));
+        PROTO::tablet->pressure(PTOOL, applyArtPressureCurve(PTOOL, e.pressure, PTOOL->m_tilt, PTOOL->m_motionSpeed, e.timeMs));
 
     if (e.updatedAxes & CTablet::eTabletToolAxes::HID_TABLET_TOOL_AXIS_DISTANCE)
         PROTO::tablet->distance(PTOOL, e.distance);
