@@ -207,6 +207,8 @@ class CTabletTool : public IHID {
     bool                        m_isDown = false;
     std::vector<uint32_t>       m_buttonsDown;
     Vector2D                    m_absolutePos; // last known absolute position.
+    uint32_t                    m_lastMotionTimeMs = 0;
+    double                      m_motionSpeed = 0; // normalized tablet-space lengths per second.
 
   private:
     CTabletTool(SP<Aquamarine::ITabletTool> tool);
