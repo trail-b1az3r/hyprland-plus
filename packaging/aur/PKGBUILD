@@ -1,7 +1,5 @@
 # Maintainer: ray0rfire
-# Dependency names come from the CMake lookups in CMakeLists.txt. pacman resolved every name on an Arch install;
-# libeis-1.0 is provided by the libei package, so that is the name here. Run namcap PKGBUILD and makepkg -s on Arch
-# before publishing.
+# Dependencies follow Nexora's tested Hyprland 0.57.0 package recipe.
 pkgname=hyprland-plus
 pkgver=0.57.0.p1
 pkgrel=1
@@ -10,46 +8,28 @@ arch=('x86_64')
 url="https://github.com/trail-b1az3r/hyprland-plus"
 license=('BSD-3-Clause')
 depends=(
-  'aquamarine'
-  'cairo'
-  'hyprcursor'
-  'hyprgraphics'
-  'hyprlang'
-  'hyprutils'
-  'lcms2'
-  'libdrm'
-  'libei'
-  'libinput'
-  'libxcursor'
-  'libxkbcommon'
-  'lua'
-  'mesa'
-  'muparser'
-  'pango'
-  'pixman'
-  're2'
-  'util-linux-libs'
-  'wayland'
-  'xcb-util-errors'
-  'xorg-xwayland'
-  'glib2'
+  aquamarine cairo glib2 glslang hyprcursor hyprgraphics hyprland-guiutils
+  hyprlang hyprutils hyprwire lcms2 libcanberra libdrm libei libglvnd
+  libinput libx11 libxcb libxcomposite libxcursor libxfixes libxkbcommon
+  libxrender lua mesa muparser opengl-driver pango pixman re2 sdbus-cpp
+  tomlplusplus util-linux-libs wayland wayland-protocols xcb-proto xcb-util
+  xcb-util-errors xcb-util-image xcb-util-keysyms xcb-util-renderutil
+  xcb-util-wm xorg-xwayland
 )
-makedepends=(
-  'cmake'
-  'git'
-  'glslang'
-  'hyprland-protocols'
-  'hyprwayland-scanner'
-  'wayland-protocols'
+makedepends=(cmake git glaze hyprland-protocols hyprwayland-scanner xorgproto)
+optdepends=(
+  'hyprpm: build and install plugins'
+  'xdg-desktop-portal-hyprland: xdg-desktop-portal backend for Hyprland'
 )
-provides=('hyprland')
+provides=("hyprland=${pkgver%.p*}" wayland-compositor)
 conflicts=('hyprland')
-source=("git+https://github.com/trail-b1az3r/hyprland-plus.git#branch=main")
+source=(
+  "git+https://github.com/trail-b1az3r/hyprland-plus.git#commit=e5d85f53a40b16ecc83f09260bf585f657effa69"
+)
 sha256sums=('SKIP')
 
 prepare() {
   cd "$pkgname"
-  # udis86 and hyprland-protocols are git submodules and makepkg does not fetch them by itself.
   git submodule update --init --recursive
 }
 
@@ -58,17 +38,18 @@ build() {
   cmake -B build -S . \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=/usr \
-    -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON \
+    -DCMAKE_SKIP_RPATH=ON \
     -Wno-dev
-  cmake --build build --config Release --target all
+  cmake --build build
 }
 
 package() {
   cd "$pkgname"
   DESTDIR="$pkgdir" cmake --install build
-
+  rm -fv "$pkgdir/usr/include/hyprland/src/version.h.in"
+  # hyprpm is provided by Arch's package and conflicts with the upstream copy.
+  find "$pkgdir" -name '*hyprpm*' -delete
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
   install -Dm644 CREDITS.md "$pkgdir/usr/share/licenses/$pkgname/CREDITS.md"
   install -Dm644 subprojects/udis86/LICENSE "$pkgdir/usr/share/licenses/$pkgname/udis86/LICENSE"
-  install -Dm644 subprojects/hyprland-protocols/LICENSE "$pkgdir/usr/share/licenses/$pkgname/hyprland-protocols/LICENSE"
 }
