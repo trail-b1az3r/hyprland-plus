@@ -481,6 +481,10 @@ std::vector<SP<IValue>> Values::getConfigValues() {
                   {.min = -1.0, .max = 1.0, .refresh = Supplementary::REFRESH_INPUT_DEVICES}),
         MS<String>("input:tablettool:pressure_curve", "Non-linear pressure response for art applications only: linear, soft, firm, or precision.", "linear",
                    {.validator = strChoice({"linear", "soft", "firm", "precision"}), .refresh = Supplementary::REFRESH_INPUT_DEVICES}),
+        MS<Float>("input:tablettool:pressure_speed", "Speed-based pressure modulation in supported art applications; 0 disables it.", 0.F,
+                  {.min = 0.F, .max = 1.F, .refresh = Supplementary::REFRESH_INPUT_DEVICES}),
+        MS<Float>("input:tablettool:pressure_tilt", "Tilt-based pressure modulation in supported art applications; 0 disables it.", 0.F,
+                  {.min = 0.F, .max = 1.F, .refresh = Supplementary::REFRESH_INPUT_DEVICES}),
 
         /*
          * gestures:
