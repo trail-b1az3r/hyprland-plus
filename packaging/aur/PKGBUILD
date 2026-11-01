@@ -25,7 +25,7 @@ optdepends=(
 provides=("hyprland=${pkgver%.p*}" wayland-compositor)
 conflicts=('hyprland')
 source=(
-  "hyprland-plus::git+https://github.com/trail-b1az3r/hyprland-plus.git#commit=347a6523c95f749ea22895be9f9529d28f103db4"
+  "hyprland-plus::git+https://github.com/trail-b1az3r/hyprland-plus.git#commit=97963eef12d36404c605eda5358007addbb93d35"
   "udis86::git+https://github.com/canihavesomecoffee/udis86.git#commit=${_udis86}"
 )
 sha256sums=('SKIP' 'SKIP')
