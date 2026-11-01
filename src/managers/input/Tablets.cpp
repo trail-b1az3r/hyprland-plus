@@ -7,6 +7,7 @@
 #include "../../protocols/PointerConstraints.hpp"
 #include "../../protocols/core/DataDevice.hpp"
 #include "../../event/EventBus.hpp"
+#include "../../config/ConfigManager.hpp"
 
 #include <algorithm>
 #include <cmath>
