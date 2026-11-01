@@ -26,7 +26,7 @@ jobs:
 
       - name: Install clang-format
         run: |
-          pacman -Syu --noconfirm --needed clang
+          pacman -Syu --noconfirm --needed clang git
 
       - name: Format tablet implementation and tests
         run: |
