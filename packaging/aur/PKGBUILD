@@ -21,8 +21,6 @@ makedepends=(cmake git glaze hyprland-protocols hyprwayland-scanner xorgproto)
 optdepends=(
   'hyprpm: build and install plugins'
   'xdg-desktop-portal-hyprland: xdg-desktop-portal backend for Hyprland'
-  'touchd-dkms: Surface IPTS DKMS touchscreen driver and control utility'
-  'iptsd: Surface multitouch and stylus userspace daemon'
 )
 provides=("hyprland=${pkgver%.p*}" wayland-compositor)
 conflicts=('hyprland')
