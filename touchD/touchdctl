@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CONFIG=/etc/iptsd.conf
+CONFIG=/etc/iptsd.d/80-touchd-surface-pro-5.conf
 PROFILE=/usr/share/touchD/iptsd-surface-pro-5.conf
 
 usage() {
@@ -60,9 +60,22 @@ case "\${1:-}" in
     echo "Existing config was backed up if it existed. Restart with: sudo touchdctl restart"
     ;;
   calibrate)
+    need_root
     command -v iptsd-calibrate >/dev/null 2>&1 || { echo "iptsd-calibrate is not installed; update iptsd." >&2; exit 1; }
-    echo "Follow the calibration tool prompts."
-    exec iptsd-calibrate
+    command -v iptsd-find-hidraw >/dev/null 2>&1 || { echo "iptsd-find-hidraw is not installed; update iptsd." >&2; exit 1; }
+    command -v iptsd-find-service >/dev/null 2>&1 || { echo "iptsd-find-service is not installed; update iptsd." >&2; exit 1; }
+    unit=$(iptsd-find-service)
+    device=$(iptsd-find-hidraw)
+    [[ -n "$unit" && -n "$device" ]] || { echo "Could not identify the IPTS service or touchscreen hidraw device." >&2; exit 1; }
+    echo "Stop $unit while collecting calibration samples from $device."
+    systemctl stop "$unit"
+    restart_iptsd() { systemctl start "$unit" || true; }
+    trap restart_iptsd EXIT
+    iptsd-calibrate "$device"
+    echo
+    echo "Use the reported SizeMin, SizeMax, AspectMin and AspectMax values in:"
+    echo "  /etc/iptsd.d/90-calibration.conf"
+    echo "The IPTS service will be restarted when this command exits."
     ;;
   restart)
     need_root
