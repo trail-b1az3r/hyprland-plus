@@ -272,7 +272,7 @@ TEST(Config, tabletPressureCurvePresetsAreValidated) {
     EXPECT_TRUE(VALIDATOR("precision").has_value());
     EXPECT_FALSE(VALIDATOR("aggressive").has_value());
 
-    EXPECT_TRUE(std::ranges::contains(CONFIG_DEVICE_VALUE_NAMES, "input:tablettool:pressure_curve"));
+    EXPECT_TRUE(std::ranges::any_of(CONFIG_DEVICE_VALUE_NAMES, [](const auto& name) { return std::string_view{name} == "input:tablettool:pressure_curve"; }));
 
     struct SDynamicSetting {
         std::string_view name;
@@ -294,6 +294,6 @@ TEST(Config, tabletPressureCurvePresetsAreValidated) {
         ASSERT_TRUE(FLOAT_VALUE->m_max.has_value());
         EXPECT_FLOAT_EQ(*FLOAT_VALUE->m_min, 0.F);
         EXPECT_FLOAT_EQ(*FLOAT_VALUE->m_max, 1.F);
-        EXPECT_TRUE(std::ranges::contains(CONFIG_DEVICE_VALUE_NAMES, setting.name));
+        EXPECT_TRUE(std::ranges::any_of(CONFIG_DEVICE_VALUE_NAMES, [&setting](const auto& name) { return std::string_view{name} == setting.name; }));
     }
 }
