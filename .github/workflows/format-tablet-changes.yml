@@ -19,6 +19,11 @@ jobs:
     container:
       image: archlinux:latest
     steps:
+      # The Arch container does not include Git by default. Install it before
+      # checkout so actions/checkout creates a real worktree instead of an archive.
+      - name: Install Git before checkout
+        run: pacman -Sy --noconfirm git
+
       - name: Check out repository
         uses: actions/checkout@v6
         with:
@@ -26,7 +31,7 @@ jobs:
 
       - name: Install clang-format
         run: |
-          pacman -Syu --noconfirm --needed clang git
+          pacman -Syu --noconfirm --needed clang
 
       - name: Format tablet implementation and tests
         run: |
