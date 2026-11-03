@@ -40,7 +40,7 @@ static std::pair<int, int> activeWindowSize() {
 /// Tests that dragging a tiled window with binds:drag_center_window enabled
 /// centers the window on the cursor once it becomes floating.
 TEST_CASE(dragTiledCentered) {
-    OK(getFromSocket("/eval hl.config({ binds = { drag_center_window = true } })"));
+    OK(getFromSocket("/eval hl.config({ binds = { drag_center_window = true, drag_keep_grab_point = false } })"));
     OK(getFromSocket("r/eval hl.unbind('SUPER + mouse:272')"));
     OK(getFromSocket("r/eval hl.bind('mouse:272', hl.dsp.window.drag(), { mouse = true })"));
 
@@ -112,7 +112,7 @@ TEST_CASE(dragTiledProportional) {
 /// Tests that dragging a fullscreen window with binds:drag_center_window enabled
 /// centers it on the cursor once it is restored to its floating size.
 TEST_CASE(dragFullscreenCentered) {
-    OK(getFromSocket("/eval hl.config({ binds = { drag_center_window = true } })"));
+    OK(getFromSocket("/eval hl.config({ binds = { drag_center_window = true, drag_keep_grab_point = false } })"));
     OK(getFromSocket("r/eval hl.unbind('SUPER + mouse:272')"));
     OK(getFromSocket("r/eval hl.bind('mouse:272', hl.dsp.window.drag(), { mouse = true })"));
 
