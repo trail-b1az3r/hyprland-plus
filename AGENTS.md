@@ -12,7 +12,8 @@ This repository is the maintained `trail-b1az3r/hyprland-plus` fork, currently b
 
 ## Existing window-resistance feature
 
-- `plus:monitor_wall` is the window-resistance threshold in pixels. During a move drag, a window is held at a shared monitor edge until the pointer pushes it through the configured distance; zero disables the wall.
+- `general:snap:enabled` is the default floating-window edge resistance/snapping feature in this fork. `general:snap:window_gap`, `monitor_gap`, `respect_gaps`, and `border_overlap` tune its targets.
+- `plus:monitor_wall` is the separate cross-monitor elastic-wall threshold in pixels. During a move drag, a window is held at a shared monitor edge until the pointer pushes it through the configured distance; zero disables the wall.
 - `CMonitorWall` is intentionally independent of compositor types. Keep its geometry/state logic testable and keep drag integration in `DragController`.
 - The compositor emits `monitorwall` / `monitorwallbreak` events. Halcyon's Quickshell draws the corresponding monitor-edge bulge; do not duplicate that UI effect in the compositor.
 - Preserve the established drag behavior when changing the threshold: windows already crossing an edge at drag start are not captured, and once a wall gives way it remains open until the window is pulled back inside.
