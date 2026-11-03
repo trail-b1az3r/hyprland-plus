@@ -73,8 +73,21 @@ jobs:
             exit 1
           fi
           install -d -m 700 ~/.ssh
-          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/aur
+          # Accept multiline, escaped-newline, and base64-encoded GitHub secrets.
+          KEY_CONTENT="${AUR_SSH_PRIVATE_KEY//$'\r'/}"
+          if [[ "$KEY_CONTENT" == *'\n'* && "$KEY_CONTENT" != *$'\n'* ]]; then
+            KEY_CONTENT="${KEY_CONTENT//\\n/$'\n'}"
+          fi
+          if [[ "$KEY_CONTENT" != *"-----BEGIN "* ]]; then
+            DECODED_KEY="$(printf '%s' "$KEY_CONTENT" | base64 --decode 2>/dev/null || true)"
+            if [[ "$DECODED_KEY" == *"-----BEGIN "* ]]; then KEY_CONTENT="$DECODED_KEY"; fi
+          fi
+          printf '%s\n' "$KEY_CONTENT" > ~/.ssh/aur
           chmod 600 ~/.ssh/aur
+          if ! ssh-keygen -y -f ~/.ssh/aur >/dev/null 2>&1; then
+            echo "::error::AUR_SSH_PRIVATE_KEY is not a readable private key. Store the full multiline key, escaped-newline key, or base64-encoded private key in the repository secret."
+            exit 1
+          fi
           ssh-keyscan -t ed25519 aur.archlinux.org >> ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
           export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/aur -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes"
