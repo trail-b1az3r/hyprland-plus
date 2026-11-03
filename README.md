@@ -86,6 +86,20 @@ binds {
 Source: `binds:drag_keep_grab_point` in `src/config/values/ConfigValues.cpp`, and `floatingGrab` in
 `src/layout/supplementary/DragController.cpp`.
 
+## Window resistance and edge snapping: `general:snap`
+
+Floating windows can resist and snap to nearby floating windows and monitor edges while being dragged. This is enabled by default in hyprland-plus; set `general:snap:enabled = false` to restore free movement.
+
+- `general:snap:window_gap`: proximity threshold for snapping to another window (default 10 px).
+- `general:snap:monitor_gap`: proximity threshold for snapping to a monitor edge (default 10 px).
+- `general:snap:respect_gaps`: when true, snap targets honour the configured gaps.
+- `general:snap:border_overlap`: when true, snapped windows leave only a border's width between them.
+- The same snapping path applies to mini windows; `plus:monitor_wall` is a separate elastic threshold for dragging a window across a shared monitor edge.
+
+```lua
+hl.config({ general = { snap = { enabled = true, window_gap = 10, monitor_gap = 10, respect_gaps = true } } })
+```
+
 ## Mini windows: `hl.dsp.window.mini`
 
 A mini window is a very small floating window. It can be moved anywhere on the screen and fitted around other
