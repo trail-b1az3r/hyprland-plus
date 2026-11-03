@@ -1,5 +1,21 @@
-# AGENTS.md
+# Repository-specific agent notes
 
+This repository is the maintained `trail-b1az3r/hyprland-plus` fork, currently based on Hyprland 0.57.0. `CLAUDE.MD` is a symlink to this file; edit `AGENTS.md` to change the shared agent instructions without replacing that link.
+
+## Build and dependency baseline
+
+- Build with CMake; the canonical Arch package recipe is `packaging/aur/PKGBUILD`.
+- Aquamarine is a required C++ rendering-backend dependency. The supported baseline is **0.15.1 or newer**; do not add compatibility shims for older 0.15.0 APIs.
+- Aquamarine is not vendored or a Git submodule. Check the installed `aquamarine.pc` version with `pkg-config --modversion aquamarine` when diagnosing builds.
+- Keep the CMake pkg-config minimum, packaging metadata, and CI environment in agreement when changing the Aquamarine baseline.
+- Run the focused unit tests for touched code, then the project build and CI checks. The monitor-wall logic is covered by `tests/plus/MonitorWall.cpp`.
+
+## Existing window-resistance feature
+
+- `plus:monitor_wall` is the window-resistance threshold in pixels. During a move drag, a window is held at a shared monitor edge until the pointer pushes it through the configured distance; zero disables the wall.
+- `CMonitorWall` is intentionally independent of compositor types. Keep its geometry/state logic testable and keep drag integration in `DragController`.
+- The compositor emits `monitorwall` / `monitorwallbreak` events. Halcyon's Quickshell draws the corresponding monitor-edge bulge; do not duplicate that UI effect in the compositor.
+- Preserve the established drag behavior when changing the threshold: windows already crossing an edge at drag start are not captured, and once a wall gives way it remains open until the window is pulled back inside.
 ## Review guidelines
 
 - Prioritize correctness, lack of regressions, performance, API stability, and code clarity and readability.
