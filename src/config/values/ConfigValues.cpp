@@ -186,7 +186,7 @@ std::vector<SP<IValue>> Values::getConfigValues() {
         MS<Bool>("general:allow_tearing", "master switch for allowing tearing to occur.", false),
         MS<Int>("general:resize_corner", "force floating windows to use a specific corner when being resized (1-4 going clockwise from top left, 0 to disable)", 0,
                 {.min = 0, .max = 4, .map = OptionMap{{"disable", 0}, {"top_left", 1}, {"top_right", 2}, {"bottom_right", 3}, {"bottom_left", 4}}}),
-        MS<Bool>("general:snap:enabled", "enable snapping for floating windows", false),
+        MS<Bool>("general:snap:enabled", "enable window-edge resistance and snapping for floating windows", true),
         MS<Int>("general:snap:window_gap", "minimum gap in pixels between windows before snapping", 10, {.min = 0, .max = 100}),
         MS<Int>("general:snap:monitor_gap", "minimum gap in pixels between window and monitor edges before snapping", 10, {.min = 0, .max = 100}),
         MS<Bool>("general:snap:border_overlap", "if true, windows snap such that only one border's worth of space is between them", false),
