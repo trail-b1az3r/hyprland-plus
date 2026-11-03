@@ -34,27 +34,44 @@ jobs:
           pacman -Syu --noconfirm --needed clang
 
       - name: Format tablet implementation and tests
+        shell: bash
         run: |
+          set -euo pipefail
+          GIT_DIR="$(find /__w -maxdepth 5 -type d -name .git -print -quit)"
+          if [[ -z "$GIT_DIR" ]]; then
+            echo "::error::Checkout did not create a Git worktree under /__w."
+            exit 1
+          fi
+          REPO_DIR="${GIT_DIR%/.git}"
           clang-format -i \
-            src/managers/input/Tablets.cpp \
-            src/devices/Tablet.hpp \
-            tests/config/BlurVariants.cpp
+            "$REPO_DIR/src/managers/input/Tablets.cpp" \
+            "$REPO_DIR/src/devices/Tablet.hpp" \
+            "$REPO_DIR/tests/config/BlurVariants.cpp"
 
       - name: Commit formatting fixes
-        working-directory: ${{ github.workspace }}
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if git diff --quiet; then
+          GIT_DIR="$(find /__w -maxdepth 5 -type d -name .git -print -quit)"
+          if [[ -z "$GIT_DIR" ]]; then
+            echo "::error::Checkout did not create a Git worktree under /__w."
+            exit 1
+          fi
+          REPO_DIR="${GIT_DIR%/.git}"
+          if git -C "$REPO_DIR" diff --quiet -- \
+            src/managers/input/Tablets.cpp \
+            src/devices/Tablet.hpp \
+            tests/config/BlurVariants.cpp; then
             echo "The tablet files are already formatted."
             exit 0
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
+          git -C "$REPO_DIR" config user.name "github-actions[bot]"
+          git -C "$REPO_DIR" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$REPO_DIR" add \
             src/managers/input/Tablets.cpp \
             src/devices/Tablet.hpp \
             tests/config/BlurVariants.cpp
-          git commit -m "style(tablet): apply clang-format"
-          git push origin HEAD:main
+          git -C "$REPO_DIR" commit -m "style(tablet): apply clang-format"
+          git -C "$REPO_DIR" push origin HEAD:main
