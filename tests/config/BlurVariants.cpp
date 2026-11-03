@@ -255,9 +255,7 @@ TEST(Config, fluidJarSettingsAreBounded) {
 }
 
 TEST(Config, tabletPressureCurvePresetsAreValidated) {
-    const auto VALUE = std::ranges::find_if(CONFIG_VALUES, [](const auto& value) {
-        return std::string_view{value->name()} == "input:tablettool:pressure_curve";
-    });
+    const auto VALUE = std::ranges::find_if(CONFIG_VALUES, [](const auto& value) { return std::string_view{value->name()} == "input:tablettool:pressure_curve"; });
     ASSERT_NE(VALUE, CONFIG_VALUES.end());
 
     const auto STRING_VALUE = dynamicPointerCast<CStringValue>(*VALUE);
@@ -276,16 +274,14 @@ TEST(Config, tabletPressureCurvePresetsAreValidated) {
 
     struct SDynamicSetting {
         std::string_view name;
-        float defaultValue;
+        float            defaultValue;
     };
     constexpr std::array DYNAMIC_SETTINGS = {
         SDynamicSetting{"input:tablettool:pressure_speed", 0.F},
         SDynamicSetting{"input:tablettool:pressure_tilt", 0.F},
     };
     for (const auto& setting : DYNAMIC_SETTINGS) {
-        const auto DYNAMIC_VALUE = std::ranges::find_if(CONFIG_VALUES, [&setting](const auto& value) {
-            return std::string_view{value->name()} == setting.name;
-        });
+        const auto DYNAMIC_VALUE = std::ranges::find_if(CONFIG_VALUES, [&setting](const auto& value) { return std::string_view{value->name()} == setting.name; });
         ASSERT_NE(DYNAMIC_VALUE, CONFIG_VALUES.end());
         const auto FLOAT_VALUE = dynamicPointerCast<CFloatValue>(*DYNAMIC_VALUE);
         ASSERT_TRUE(FLOAT_VALUE);

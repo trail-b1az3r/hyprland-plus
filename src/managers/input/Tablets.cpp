@@ -105,16 +105,14 @@ static double applyArtPressureCurve(SP<CTabletTool> tool, double pressure, const
         return pressure;
 
     if (tool->m_pressureSurface.lock() != SURFACE_RESOURCE) {
-        tool->m_pressureSurface = SURFACE_RESOURCE;
+        tool->m_pressureSurface         = SURFACE_RESOURCE;
         tool->m_pressureSurfaceIsArtApp = false;
 
         if (const auto SURFACE = Desktop::View::CWLSurface::fromResource(SURFACE_RESOURCE)) {
             if (const auto WINDOW = Desktop::View::CWindow::fromView(SURFACE->view())) {
-                const auto APPID = WINDOW->metadata().appID();
-                tool->m_pressureSurfaceIsArtApp =
-                    APPID.find("krita") != std::string::npos || APPID.find("gimp") != std::string::npos ||
-                    APPID.find("inkscape") != std::string::npos || APPID.find("mypaint") != std::string::npos ||
-                    APPID.find("blender") != std::string::npos;
+                const auto APPID                = WINDOW->metadata().appID();
+                tool->m_pressureSurfaceIsArtApp = APPID.find("krita") != std::string::npos || APPID.find("gimp") != std::string::npos ||
+                    APPID.find("inkscape") != std::string::npos || APPID.find("mypaint") != std::string::npos || APPID.find("blender") != std::string::npos;
             }
         }
     }
@@ -122,14 +120,12 @@ static double applyArtPressureCurve(SP<CTabletTool> tool, double pressure, const
     if (!tool->m_pressureSurfaceIsArtApp)
         return pressure;
 
-    const auto CURVE = Config::mgr()->getDeviceString(tool->m_hlName, "pressure_curve", "input:tablettool:pressure_curve");
-    const auto SPEED_SENSITIVITY = std::clamp(
-        Config::mgr()->getDeviceFloat(tool->m_hlName, "pressure_speed", "input:tablettool:pressure_speed"), 0.F, 1.F);
-    const auto TILT_SENSITIVITY = std::clamp(
-        Config::mgr()->getDeviceFloat(tool->m_hlName, "pressure_tilt", "input:tablettool:pressure_tilt"), 0.F, 1.F);
-    const auto P = std::clamp(pressure, 0.0, 1.0);
+    const auto CURVE             = Config::mgr()->getDeviceString(tool->m_hlName, "pressure_curve", "input:tablettool:pressure_curve");
+    const auto SPEED_SENSITIVITY = std::clamp(Config::mgr()->getDeviceFloat(tool->m_hlName, "pressure_speed", "input:tablettool:pressure_speed"), 0.F, 1.F);
+    const auto TILT_SENSITIVITY  = std::clamp(Config::mgr()->getDeviceFloat(tool->m_hlName, "pressure_tilt", "input:tablettool:pressure_tilt"), 0.F, 1.F);
+    const auto P                 = std::clamp(pressure, 0.0, 1.0);
 
-    double result = P;
+    double     result = P;
     if (CURVE == "soft")
         result = std::sqrt(P);
     else if (CURVE == "firm")
@@ -139,9 +135,9 @@ static double applyArtPressureCurve(SP<CTabletTool> tool, double pressure, const
 
     // Tablet absolute coordinates are normalized. Two tablet widths per second
     // saturates the speed factor; the tilt magnitude is expressed in degrees.
-    const auto FRESH_SPEED = timeMs >= tool->m_lastMotionTimeMs && timeMs - tool->m_lastMotionTimeMs <= 100 ? speed : 0.0;
+    const auto FRESH_SPEED  = timeMs >= tool->m_lastMotionTimeMs && timeMs - tool->m_lastMotionTimeMs <= 100 ? speed : 0.0;
     const auto SPEED_FACTOR = std::clamp(FRESH_SPEED / 2.0, 0.0, 1.0);
-    const auto TILT_FACTOR = std::clamp(std::hypot(tilt.x, tilt.y) / 90.0, 0.0, 1.0);
+    const auto TILT_FACTOR  = std::clamp(std::hypot(tilt.x, tilt.y) / 90.0, 0.0, 1.0);
     result *= 1.0 - (0.25 * SPEED_SENSITIVITY * SPEED_FACTOR);
     result *= 1.0 + (0.15 * TILT_SENSITIVITY * TILT_FACTOR);
     return std::clamp(result, 0.0, 1.0);
@@ -184,9 +180,9 @@ void CInputManager::onTabletAxis(CTablet::SAxisEvent e) {
         Vector2D delta = {std::isnan(dx) ? 0.0 : dx, std::isnan(dy) ? 0.0 : dy};
 
         if (PTOOL->m_lastMotionTimeMs != 0 && e.timeMs > PTOOL->m_lastMotionTimeMs) {
-            const auto ELAPSED = static_cast<double>(e.timeMs - PTOOL->m_lastMotionTimeMs) / 1000.0;
-            const auto DX = std::isnan(x) ? 0.0 : x - PTOOL->m_absolutePos.x;
-            const auto DY = std::isnan(y) ? 0.0 : y - PTOOL->m_absolutePos.y;
+            const auto ELAPSED   = static_cast<double>(e.timeMs - PTOOL->m_lastMotionTimeMs) / 1000.0;
+            const auto DX        = std::isnan(x) ? 0.0 : x - PTOOL->m_absolutePos.x;
+            const auto DY        = std::isnan(y) ? 0.0 : y - PTOOL->m_absolutePos.y;
             PTOOL->m_motionSpeed = ELAPSED > 0.0 ? std::hypot(DX, DY) / ELAPSED : 0.0;
         } else {
             PTOOL->m_motionSpeed = 0.0;
@@ -317,9 +313,9 @@ void CInputManager::onTabletProximity(CTablet::SProximityEvent e) {
             const auto PTOOL = ensureTabletToolPresent(e.tool);
             if (PTOOL->getSurface())
                 unfocusTool(PTOOL);
-            PTOOL->m_active = false;
-            PTOOL->m_isDown = false;
-            PTOOL->m_motionSpeed = 0.0;
+            PTOOL->m_active           = false;
+            PTOOL->m_isDown           = false;
+            PTOOL->m_motionSpeed      = 0.0;
             PTOOL->m_lastMotionTimeMs = 0;
             PTOOL->m_buttonsDown.clear();
             m_lastInputTablet = false;
@@ -338,8 +334,8 @@ void CInputManager::onTabletProximity(CTablet::SProximityEvent e) {
     PTOOL->m_active = e.in;
 
     if (!e.in) {
-        m_lastInputTablet = false;
-        PTOOL->m_motionSpeed = 0.0;
+        m_lastInputTablet         = false;
+        PTOOL->m_motionSpeed      = 0.0;
         PTOOL->m_lastMotionTimeMs = 0;
         if (PTOOL->getSurface())
             unfocusTool(PTOOL);
