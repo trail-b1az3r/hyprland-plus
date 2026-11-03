@@ -9,7 +9,7 @@ arch=('x86_64')
 url="https://github.com/trail-b1az3r/hyprland-plus"
 license=('BSD-3-Clause')
 depends=(
-  aquamarine cairo glib2 glslang hyprcursor hyprgraphics hyprland-guiutils
+  'aquamarine>=0.15.1' cairo glib2 glslang hyprcursor hyprgraphics hyprland-guiutils
   hyprlang hyprutils hyprwire lcms2 libcanberra libdrm libei libglvnd
   libinput libx11 libxcb libxcomposite libxcursor libxfixes libxkbcommon
   libxrender lua mesa muparser opengl-driver pango pixman re2 sdbus-cpp
