@@ -664,6 +664,10 @@ std::vector<SP<IValue>> Values::getConfigValues() {
                 "Draw each monitor at most this many times a second, to save power (Halcyon's super battery saver sets 12). "
                 "Frames asked for sooner are drawn at the next turn, with everything that changed. 0: no limit.",
                 0, {.min = 0, .max = 1000}),
+        MS<Int>("plus:window_resistance",
+                "A dragged floating window stops at the screen's edges and at other windows' edges on its workspace, and goes "
+                "past one only once pushed this many pixels beyond it. Edges two monitors share are plus:monitor_wall's. 0: off.",
+                0, {.min = 0, .max = 400}),
         MS<Int>("plus:monitor_wall",
                 "How hard a dragged window has to push, in pixels, to go onto another monitor: it stops at the shared edge like against something "
                 "elastic, and goes through once pushed this far past it (the monitorwall event says where, for the shell's bulge). 0: no wall.",

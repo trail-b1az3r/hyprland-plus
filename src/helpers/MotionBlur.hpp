@@ -7,6 +7,11 @@
 namespace MotionBlur {
     CBox extents(const CBox& previous, const CBox& current);
 
+    /** How many samples a move from previous to current needs, at most maxSamples: 0 when no corner moved as much as
+     *  1.5 px (a blur that small cannot be seen, so the pass is skipped), then one sample more per 6 px of the
+     *  largest corner's travel, from 2. Slow moves cost a fraction of a fast one's. */
+    int samplesFor(const CBox& previous, const CBox& current, int maxSamples);
+
     struct SState {
         CBox previous;
         CBox current;

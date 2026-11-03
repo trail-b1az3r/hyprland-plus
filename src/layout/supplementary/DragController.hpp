@@ -72,5 +72,6 @@ namespace Layout::Supplementary {
 
         void               applyMonitorWall(Vector2D& pos, const Vector2D& size);
         void               endMonitorWall();
+        void               applyResistance(Vector2D& pos, const Vector2D& size);
     };
 };

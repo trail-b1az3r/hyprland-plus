@@ -66,6 +66,20 @@ hl.config({ binds = { drag_fullscreen_edge = 8 } })
 - `floatingGrab`: `src/layout/supplementary/DragController.cpp`
 - The guide: `renderDragGuide` in `src/render/Renderer.cpp`
 
+## Window resistance: `plus:window_resistance`
+
+A floating window being dragged stops when one of its edges meets the edge of the screen, or the edge of another
+window on the same workspace (where they would start to overlap), and stays there until the cursor has pushed this
+many pixels further; then it moves on freely. Going back, it stops again at the next edge it meets. It makes lining
+windows up against each other and against the screen easy without a snapping grid. `0` (the default) turns it off;
+Halcyon sets `24`. Edges that two monitors share are left to the monitor wall below.
+
+```lua
+hl.config({ plus = { window_resistance = 32 } })
+```
+
+Source: `src/plus/Resistance.cpp` (tested in `tests/plus/Resistance.cpp`), driven from `DragController.cpp`.
+
 ## The wall between monitors: `plus:monitor_wall`
 
 Drag a window against an edge it shares with another monitor and it stops there, as if against something elastic.
