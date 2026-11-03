@@ -330,7 +330,7 @@ Category: `decoration.motion_blur`
 | Name | Description | Type | Default | Limits |
 | --- | --- | --- | --- | --- |
 | enabled | enable motion blur on moving/resizing windows | bool | `false` | |
-| samples | The amount of samples to render. More will mean clearer blur, at the cost of more compute | int | `7` | [1 - 64] |
+| samples | The most samples a frame renders. More will mean clearer blur, at the cost of more compute. Slow moves use fewer (one per 6 px of travel, from 2), and moves under 1.5 px skip the pass | int | `7` | [1 - 64] |
 
 #### Wobble
 
