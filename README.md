@@ -152,6 +152,19 @@ With a value above 0, a window dropped within that many pixels of the top of its
 fullscreen. Default `0` (off). The drag must have started below the strip and moved at least 8 pixels. Source:
 `droppedAtTopEdge` in `src/layout/supplementary/DragController.cpp`.
 
+## Window resistance between monitors: `plus:monitor_wall`
+
+A floating window being dragged across two monitors that share an edge meets an elastic wall. It stops at the shared edge until it has been pushed the configured number of pixels past it; then it passes through. The wall follows the window onto the next monitor, so the same resistance applies at the next shared edge. A window already crossing an edge when the drag begins is left alone.
+
+- `plus:monitor_wall`: resistance in pixels (default 120; 0 disables it).
+- The `monitorwall` socket2 event reports the monitor, edge, span and normalized push strength while the wall is held. `monitorwallbreak` marks the moment it gives way.
+- Halcyon's Quickshell listens for those events and draws a soft bulge on the receiving monitor's edge; this is a shell effect, not compositor rendering.
+
+```lua
+hl.config({ plus = { monitor_wall = 120 } })
+```
+
+The geometry and give-way behavior are covered by `tests/plus/MonitorWall.cpp`; keep those tests when changing drag integration.
 ## Plustile windows: `plustile` and `hl.dsp.window.resize_edge`
 
 A plustile window is a tiled window that can be resized from each of its four edges. Only plustile windows can be
