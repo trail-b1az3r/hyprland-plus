@@ -25,13 +25,16 @@ patches; touchD does not silently patch or replace your kernel.
 If the running kernel already has IPTS built in, you do not need the DKMS
 module. Do not load a second IPTS module over an in-tree driver.
 
-## Surface Pro 5 setup
+## Setup
 
 ~~~sh
-sudo touchdctl profile surface-pro-5
+sudo touchdctl profile          # detects the model; or name it: surface-pro-4/5/6, surface-book, surface-laptop
 sudo touchdctl restart
-touchdctl status
+touchdctl doctor                # every piece touch and pen need, with how to fix what is missing
 ~~~
+
+The Surface Pro 4–6, Surface Book 1–2 and Surface Laptop 1–2 share the same IPTS digitizer generation, so they use
+the same profile; it was tuned on a Surface Pro 5, and calibrating fits it to your screen.
 
 The profile is installed as
 `/etc/iptsd.d/80-touchd-surface-pro-5.conf`, leaving your main
@@ -40,13 +43,16 @@ finger contacts, enables IPTSD palm classification, preserves finger input
 while the pen is hovering, and raises the DFT pen-button magnitude threshold
 to reduce accidental button events.
 
-Run `sudo touchdctl calibrate` to stop the detected IPTSD service, find the
-touchscreen's hidraw device, and launch the upstream calibration tool. Touch
-each finger lightly and firmly, then test multi-finger gestures; avoid resting
-your palm on the display during calibration. The command restarts IPTSD on
-exit. Copy the final `SizeMin`, `SizeMax`, `AspectMin` and `AspectMax`
-values into `/etc/iptsd.d/90-calibration.conf` under `[Contacts]`. This
-later drop-in overrides the broad defaults in the touchD profile.
+Run `sudo touchdctl calibrate --apply` to stop the detected IPTSD service, find the
+touchscreen's hidraw device, and launch the upstream calibration tool. When you
+press Ctrl+C, its final values are written to `/etc/iptsd.d/90-calibration.conf`
+for you (the old file is backed up); on NixOS they are printed for
+`services.touchD.calibration` instead. Touch each finger lightly and firmly,
+then test multi-finger gestures; avoid resting your palm on the display during
+calibration. The command restarts IPTSD on exit. Without `--apply`, copy the
+final `SizeMin`, `SizeMax`, `AspectMin` and `AspectMax` values into
+`/etc/iptsd.d/90-calibration.conf` under `[Contacts]` yourself. This later
+drop-in overrides the broad defaults in the touchD profile.
 
 ## Pen controls and pressure
 

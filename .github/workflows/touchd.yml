@@ -1,0 +1,22 @@
+# touchD: shellcheck and the touchdctl tests (touchD/tests), whenever touchD changes.
+name: touchD
+
+on:
+  push:
+    paths: ["touchD/**", ".github/workflows/touchd.yml"]
+  pull_request:
+    paths: ["touchD/**", ".github/workflows/touchd.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: shellcheck touchD/touchdctl touchD/touchd.install touchD/tests/test_touchdctl.sh
+      - name: touchdctl tests
+        run: touchD/tests/test_touchdctl.sh
