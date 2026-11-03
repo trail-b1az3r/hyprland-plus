@@ -1,7 +1,7 @@
 # Maintainer: trail-b1az3r contributors
 pkgname=touchd-dkms
 pkgver=1.0.0
-pkgrel=1
+pkgrel=2
 pkgdesc="touchD: DKMS Intel Precise Touch kernel module for Microsoft Surface devices"
 arch=('x86_64')
 url="https://github.com/linux-surface/intel-precise-touch"
@@ -19,6 +19,9 @@ package() {
   cp -a src "$pkgdir/usr/src/ipts-$pkgver/"
   install -Dm644 Makefile "$pkgdir/usr/src/ipts-$pkgver/Makefile"
   install -Dm644 dkms.conf "$pkgdir/usr/src/ipts-$pkgver/dkms.conf"
+  # Never build for a kernel that has its own IPTS driver (linux-surface): the copy in /updates would shadow it.
+  # This holds for dkms's own pacman hook too, which builds every module for every kernel.
+  echo 'BUILD_EXCLUSIVE_CONFIG="!CONFIG_HID_IPTS"' >> "$pkgdir/usr/src/ipts-$pkgver/dkms.conf"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/intel-precise-touch/LICENSE"
   install -Dm644 "$startdir/../LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
   install -Dm755 "$srcdir/touchdctl" "$pkgdir/usr/bin/touchdctl"

@@ -41,11 +41,32 @@ grep -q "Model: unknown (XPS 13)" <<<"$("$ctl" status)" && ok "not a Surface" ||
 source <(sed -n '/^last_value()/,/^}/p; /^write_calibration()/,/^}/p' "$ctl")
 CALIBRATION="$tmp/etc/90-calibration.conf"
 printf 'SizeMin: 0.100\nSizeMax: 1.000\nAspectMin = 0.9\nAspectMax: 2.0\nSizeMin: 0.180\nSizeMax: 1.950\n' > "$tmp/log"
-write_calibration "$tmp/log" >/dev/null
+mkdir -p "$tmp/work-old" "$tmp/work-new"
+write_calibration "$tmp/log" "$tmp/work-old" >/dev/null
 grep -q "SizeMin = 0.180" "$CALIBRATION" && grep -q "SizeMax = 1.950" "$CALIBRATION" && grep -q "^\[Contacts\]" "$CALIBRATION" \
   && ok "calibration keeps the final values" || fail "calibration file: $(cat "$CALIBRATION")"
 printf 'SizeMin: 0.1\n' > "$tmp/short"
-if write_calibration "$tmp/short" 2>/dev/null; then fail "partial calibration written"; else ok "partial calibration refused"; fi
+if write_calibration "$tmp/short" "$tmp/work-old" 2>/dev/null; then fail "partial calibration written"; else ok "partial calibration refused"; fi
+
+# Newer iptsd-calibrate prints only summaries and writes snippets: the 2 mm one is used.
+printf 'Size:    0.500 (Min: 0.200; Max: 0.900)\n' > "$tmp/newlog"
+for slack in 0mm:0.250 2mm:0.150 10mm:0.050; do
+  printf '[Device]\nVendor = 0x1B96\n\n[Contacts]\nSizeMin = %s\nSizeMax = 1.700\nAspectMin = 1.000\nAspectMax = 2.400\n' \
+    "${slack#*:}" > "$tmp/work-new/iptsd_calib_1B96_001F_1_${slack%%:*}.conf"
+done
+write_calibration "$tmp/newlog" "$tmp/work-new" >/dev/null
+grep -q "SizeMin = 0.150" "$CALIBRATION" && grep -q "AspectMax = 2.400" "$CALIBRATION" \
+  && ok "calibration takes the recommended snippet" || fail "snippet calibration: $(cat "$CALIBRATION")"
+
+# model: prints the profile name only on a supported Surface.
+echo "Surface Pro" > "$tmp/dmi/product_name"
+expect "model on a Surface" 0 "$ctl" model
+[[ "$out" == surface-pro-5 ]] && ok "model name" || fail "model output: $out"
+echo "XPS 13" > "$tmp/dmi/product_name"
+expect "model elsewhere" 1 "$ctl" model
+
+# The shipped profile does not switch every finger off when a palm is seen.
+grep -q "^DisableOnPalm = false" "$here/../iptsd-surface-pro-5.conf" && ok "profile keeps fingers with a palm" || fail "DisableOnPalm"
 
 # doctor reports what is missing and fails.
 expect "doctor without iptsd" 1 "$ctl" doctor

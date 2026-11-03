@@ -11,6 +11,7 @@ usage() {
 touchdctl — Surface IPTS control utility
 
   status                 Show IPTS driver, daemon, device, profile and calibration status
+  model                  Print the detected Surface model (nothing when unsupported)
   doctor                 Check every piece touch and pen need, and say how to fix what is missing
   profile [MODEL]        Back up and install the IPTSD profile (MODEL: auto, the default, or
                          surface-pro-4, surface-pro-5, surface-pro-6, surface-book, surface-laptop)
@@ -51,25 +52,64 @@ profile_supported() {
   esac
 }
 
+# The kernel's config: /proc/config.gz (Arch), else /boot/config-* (Debian-style), else the headers' copy.
+kernel_config() {
+  local kernel="${1:-$(uname -r)}"
+  if [[ "$kernel" == "$(uname -r)" && -r /proc/config.gz ]]; then
+    zcat /proc/config.gz 2>/dev/null
+  elif [[ -r "/boot/config-$kernel" ]]; then
+    cat "/boot/config-$kernel"
+  elif [[ -r "/usr/lib/modules/$kernel/build/.config" ]]; then
+    cat "/usr/lib/modules/$kernel/build/.config"
+  fi
+}
+
+# loaded, built-in, available (a module that is installed but not loaded yet), or missing.
 ipts_state() {
-  if grep -qE '(^| )ipts( |$)' /proc/modules 2>/dev/null; then
+  if grep -qE '^ipts ' /proc/modules 2>/dev/null; then
     echo loaded
-  elif grep -qE '^CONFIG_HID_IPTS=y' "/boot/config-$(uname -r)" 2>/dev/null; then
+  elif kernel_config | grep -q '^CONFIG_HID_IPTS=y'; then
     echo built-in
+  elif modinfo -F filename ipts >/dev/null 2>&1; then
+    echo available
   else
     echo missing
   fi
 }
 
-# The last value iptsd-calibrate printed for a key ("SizeMin: 0.123" or "SizeMin = 0.123").
+# Where the IPTS module comes from: kernel (the kernel's own, e.g. linux-surface), dkms (touchD's), or nothing.
+ipts_source() {
+  local file
+  file="$(modinfo -F filename ipts 2>/dev/null || true)"
+  case "$file" in
+    "") echo "" ;;
+    */updates/*|*/extra/*) echo dkms ;;
+    *) echo kernel ;;
+  esac
+}
+
+secure_boot() {
+  if command -v mokutil >/dev/null 2>&1; then
+    mokutil --sb-state 2>/dev/null | grep -qi 'SecureBoot enabled' && echo on || echo off
+  else
+    echo unknown
+  fi
+}
+
+# Older iptsd-calibrate printed the values; newer ones write snippets. The last value printed for a key for a key ("SizeMin: 0.123" or "SizeMin = 0.123").
 last_value() {
   grep -oE "$1[[:space:]]*[:=][[:space:]]*[0-9]+(\.[0-9]+)?" "$2" | tail -n1 | grep -oE '[0-9]+(\.[0-9]+)?$' || true
 }
 
 write_calibration() {
-  local log="$1" key value body=""
+  local log="$1" dir="$2" key value body="" snippet=""
+  # iptsd 2+ writes three snippets into its working directory: 0 mm, 2 mm (recommended) and 10 mm of slack.
+  snippet="$(find "$dir" -maxdepth 1 -name 'iptsd_calib_*_2mm.conf' -print -quit 2>/dev/null)"
+  [[ -n "$snippet" ]] || snippet="$(find "$dir" -maxdepth 1 -name 'iptsd_calib_*.conf' -print -quit 2>/dev/null)"
   for key in SizeMin SizeMax AspectMin AspectMax; do
-    value="$(last_value "$key" "$log")"
+    value=""
+    [[ -n "$snippet" ]] && value="$(last_value "$key" "$snippet")"
+    [[ -n "$value" ]] || value="$(last_value "$key" "$log")"
     if [[ -z "$value" ]]; then
       echo "iptsd-calibrate reported no $key; nothing written. Run it again and touch the screen longer." >&2
       return 1
@@ -108,9 +148,10 @@ case "$cmd" in
     model="$(detect_model)"
     echo "Model: ${model:-unknown ($(cat "$DMI/product_name" 2>/dev/null || echo 'no DMI'))}"
     case "$(ipts_state)" in
-      loaded) echo "IPTS module: loaded" ;;
+      loaded) echo "IPTS module: loaded ($(ipts_source))" ;;
       built-in) echo "IPTS module: built into kernel" ;;
-      *) echo "IPTS module: not loaded (or built in)" ;;
+      available) echo "IPTS module: installed ($(ipts_source)), not loaded" ;;
+      *) echo "IPTS module: missing" ;;
     esac
     if [[ -e "$CONFIG" ]]; then echo "Profile: $CONFIG"; else echo "Profile: not installed (sudo touchdctl profile)"; fi
     if [[ -e "$CALIBRATION" ]]; then echo "Calibration: $CALIBRATION"; else echo "Calibration: none (sudo touchdctl calibrate --apply)"; fi
@@ -123,11 +164,24 @@ case "$cmd" in
       echo "iptsd-systemd is missing; update iptsd."
     fi
     ;;
+  model)
+    # The detected model, as the profile names it; nothing (and failure) when it isn't a supported Surface.
+    model="$(detect_model)"
+    [[ -n "$model" ]] && echo "$model"
+    [[ -n "$model" ]]
+    ;;
   doctor)
     echo "touchD doctor"
     state="$(ipts_state)"
     check "IPTS kernel driver ($state)" "$([[ $state != missing ]] && echo ok)" \
-      "Boot the linux-surface kernel, or install touchd-dkms with matching kernel headers."
+      "Boot the linux-surface kernel, or install touchd-dkms with headers for $(uname -r) (then: sudo dkms autoinstall)."
+    if [[ $state == available ]]; then
+      check "IPTS driver loaded" "" "sudo modprobe ipts (it loads by itself at boot when the touch controller is found)"
+    fi
+    if [[ "$(ipts_source)" == dkms && "$(secure_boot)" == on ]]; then
+      check "touchD's IPTS module can load under Secure Boot" "" \
+        "Secure Boot refuses unsigned DKMS modules: sign it with your MOK, use the linux-surface kernel, or turn Secure Boot off."
+    fi
     check "iptsd installed" "$(command -v iptsd >/dev/null 2>&1 && echo ok)" "Install iptsd (sudo pacman -S iptsd)."
     hidraw=""
     if command -v iptsd-find-hidraw >/dev/null 2>&1; then hidraw="$(iptsd-find-hidraw 2>/dev/null || true)"; fi
@@ -180,19 +234,21 @@ case "$cmd" in
     echo "Stop the IPTS touchscreen service while collecting samples from $device."
     echo "Touch with each finger, lightly and firmly; press Ctrl+C when the numbers settle."
     iptsd-systemd -t touchscreen -i 0 -- stop
-    log="$(mktemp)"
+    work="$(mktemp -d)"
+    log="$work/calibrate.log"
     finish() {
       iptsd-systemd -t touchscreen -i 0 -- start || true
-      rm -f "$log"
+      rm -rf "$work"
     }
     trap finish EXIT
-    # Ctrl+C ends iptsd-calibrate, not this command, so its numbers can still be written.
+    # Ctrl+C ends iptsd-calibrate, not this command, so its numbers can still be written. It runs in its own
+    # folder: newer versions write their config snippets into the working directory.
     trap '' INT
-    (trap - INT; exec iptsd-calibrate "$device") | tee "$log" || true
+    (trap - INT; cd "$work" && exec iptsd-calibrate "$device") | tee "$log" || true
     trap - INT
     echo
     if (( apply )); then
-      write_calibration "$log" || exit 1
+      write_calibration "$log" "$work" || exit 1
     else
       echo "Use the reported SizeMin, SizeMax, AspectMin and AspectMax values in:"
       echo "  $CALIBRATION"

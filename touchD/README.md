@@ -22,8 +22,12 @@ kernel is recommended), matching kernel headers, and the iptsd package.
 The DKMS build can fail on a generic kernel without the IPTS prerequisite
 patches; touchD does not silently patch or replace your kernel.
 
-If the running kernel already has IPTS built in, you do not need the DKMS
-module. Do not load a second IPTS module over an in-tree driver.
+If a kernel already has its own IPTS driver (linux-surface does), touchD does not build for it: the DKMS module
+is limited to kernels without `CONFIG_HID_IPTS`, so it can never shadow the kernel's driver. On the stock Arch kernel
+(no IPTS), the DKMS module is built for it; install `linux-headers` first. With Secure Boot on, an unsigned DKMS
+module is refused: sign it with your MOK or use the linux-surface kernel (`touchdctl doctor` says which applies).
+
+Installing the package turns the profile on by itself on a supported Surface (an existing one is never replaced).
 
 ## Setup
 
@@ -45,7 +49,8 @@ to reduce accidental button events.
 
 Run `sudo touchdctl calibrate --apply` to stop the detected IPTSD service, find the
 touchscreen's hidraw device, and launch the upstream calibration tool. When you
-press Ctrl+C, its final values are written to `/etc/iptsd.d/90-calibration.conf`
+press Ctrl+C, its recommended values (the 2 mm snippet newer iptsd versions write, or the last values older ones
+print) are written to `/etc/iptsd.d/90-calibration.conf`
 for you (the old file is backed up); on NixOS they are printed for
 `services.touchD.calibration` instead. Touch each finger lightly and firmly,
 then test multi-finger gestures; avoid resting your palm on the display during
