@@ -27,6 +27,7 @@ hyprland-plus is Hyprland 0.57.0 (upstream tag `v0.57.0`) with the changes below
   window at the top of the screen to fullscreen it, off by default). See [Drag](../drag/).
 - **The wall between monitors** (0.56.2.p3): `plus:monitor_wall`, and the `monitorwall` and `monitorwallbreak`
   events. See [Drag](../drag/).
+- **Window resistance** (0.57.0.p3): `plus:window_resistance`. See [Drag](../drag/).
 - **Frame cap** (0.57.0.p1): `plus:max_fps` draws each monitor at most that many times a second, for battery
   saving. See [Config options](../../configuring/core/config-options/).
 - **hyprctl**: `dots`, `store` (or `save`) and `load`. See [hyprctl additions](../hyprctl/).

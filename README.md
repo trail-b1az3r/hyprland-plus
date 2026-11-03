@@ -172,6 +172,15 @@ hl.bind("SUPER + ALT + Right", hl.dsp.window.resize_edge({ edge = "right", amoun
 Source: `plustile` in `src/desktop/rule/windowRule/`, `resizeEdge` in `src/config/shared/actions/ConfigActions.cpp`,
 and `hl.dsp.window.resize_edge` in `src/config/lua/bindings/LuaBindingsDispatchers.cpp`.
 
+## New in 0.57.0.p3
+
+- **Window resistance**: `plus:window_resistance` makes a dragged floating window stop at the screen's edges and at
+  other windows' edges, until pushed that many pixels past them. Off by default; Halcyon sets 24. See
+  [Drag](docs/wiki/content/hyprland-plus/drag.md).
+- **touchD**: `touchdctl` subcommands work again (they all printed the usage), `profile` detects the Surface model,
+  `doctor` checks the whole touch and pen stack, and `calibrate --apply` writes the calibration for you (on NixOS,
+  `services.touchD.calibration`).
+
 ## New in 0.57.0.p2
 
 - **touchD Surface input integration**: the new `touchD/` directory packages the upstream Intel Precise Touch
@@ -222,7 +231,7 @@ See [Desk](docs/wiki/content/hyprland-plus/desk.md) and [Mini windows](docs/wiki
 
 ## Version string
 
-`hyprland --version` reports `hyprland-plus 0.57.0.p2`, from the `PLUS_VERSION` file. The fork is based on upstream
+`hyprland --version` reports `hyprland-plus 0.57.0.p3`, from the `PLUS_VERSION` file. The fork is based on upstream
 0.57.0, and `VERSION` keeps the numeric version that CMake needs. The binary and the config directory names are
 unchanged, so existing configs and session files keep working.
 
@@ -233,7 +242,7 @@ a small gold plus above and to the right of the wordmark.
 
 ## Status
 
-The maintained `main` branch is Hyprland 0.57.0.p2. The old `halcyon-0.56.2` branch is retained for older
+The maintained `main` branch is hyprland-plus 0.57.0.p3. The old `halcyon-0.56.2` branch is retained for older
 installations; new builds should use `main`. The build and live-session feature tests are still the release gate.
 
 # Features

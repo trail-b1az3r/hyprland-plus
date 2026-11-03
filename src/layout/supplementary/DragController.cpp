@@ -18,6 +18,7 @@
 #include "../../render/Renderer.hpp"
 #include "../../state/MonitorState.hpp"
 #include "../../ipc/s2/S2.hpp"
+#include "../../plus/Resistance.hpp"
 
 #include <hyprutils/utils/ScopeGuard.hpp>
 #include <string_view>
@@ -325,6 +326,37 @@ void CDragStateController::applyMonitorWall(Vector2D& pos, const Vector2D& size)
     });
 }
 
+// plus:window_resistance: stop at the screen's edges and at other windows' edges on the same workspace until pushed past
+// them (src/plus/Resistance.hpp). Edges two monitors share are the monitor wall's.
+void CDragStateController::applyResistance(Vector2D& pos, const Vector2D& size) {
+    static auto PRESIST = CConfigValue<Config::INTEGER>("plus:window_resistance");
+    if (*PRESIST <= 0)
+        return;
+
+    const auto TARGET = m_target.lock();
+    if (!TARGET)
+        return;
+    const auto               SELF = TARGET->window();
+
+    std::vector<Plus::SRect> monitors;
+    for (const auto& m : State::monitorState()->monitors()) {
+        if (!m || !m->m_enabled)
+            continue;
+        monitors.push_back(wallRect(m->logicalBox()));
+    }
+
+    std::vector<Plus::SRect> windows;
+    for (const auto& w : Desktop::windowState()->windows()) {
+        if (!w || w == SELF || !w->mapped() || w->isHidden() || !w->m_workspace || !SELF || w->m_workspace != SELF->m_workspace)
+            continue;
+        windows.push_back(wallRect(w->getWindowMainSurfaceBox()));
+    }
+
+    const auto PREVIOUS = TARGET->position();
+    const auto R        = Plus::resist(wallRect(PREVIOUS), {.x = pos.x, .y = pos.y, .w = size.x, .h = size.y}, windows, monitors, *PRESIST);
+    pos                 = {R.x, R.y};
+}
+
 void CDragStateController::endMonitorWall() {
     if (!m_wallPushedOn.empty())
         IPC::Socket2::sock()->postEvent({.event = "monitorwall", .data = std::format("{},none,0,0,0", m_wallPushedOn)});
@@ -495,6 +527,8 @@ void CDragStateController::mouseMove(const Vector2D& mousePos) {
         if (*SNAPENABLED && !m_draggingTiled)
             g_layoutManager->performSnap(newPos, newSize, DRAGGINGTARGET, MBIND_MOVE, -1, m_beginDragSizeXY);
 
+        if (!m_draggingTiled)
+            applyResistance(newPos, newSize);
         applyMonitorWall(newPos, newSize);
 
         newPos = newPos.round();
