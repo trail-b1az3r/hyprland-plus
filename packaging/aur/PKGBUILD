@@ -1,10 +1,10 @@
 # Maintainer: ray0rfire
-# Dependencies follow Nexora's tested Hyprland 0.57.0 package recipe.
+# Dependencies follow Nexora's tested Hyprland 0.57.1 package recipe.
 pkgname=hyprland-plus
-pkgver=0.57.0.p2
+pkgver=0.57.1.p1
 pkgrel=1
 _udis86=5336633af70f3917760a6d441ff02d93477b0c86
-pkgdesc="Hyprland 0.57.0 with Halcyon window features, app-scoped pen pressure curves and Surface touchD integration"
+pkgdesc="Hyprland 0.57.1 with Halcyon window features, app-scoped pen pressure curves and Surface touchD integration"
 arch=('x86_64')
 url="https://github.com/trail-b1az3r/hyprland-plus"
 license=('BSD-3-Clause')

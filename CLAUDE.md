@@ -2,8 +2,8 @@
 
 hyprland-plus is Hyprland with the Halcyon desktop's additions (mini windows, superposition, Plus Tiles, desk, drag
 options, the monitor wall, window resistance, the frame cap, touchD). It is based on an upstream Hyprland release:
-`VERSION` is that release (CMake needs a plain number), `PLUS_VERSION` is this fork's (`0.57.0.p3` is the third
-hyprland-plus release on Hyprland 0.57.0). `hyprland --version` prints both.
+`VERSION` is that release (CMake needs a plain number), `PLUS_VERSION` is this fork's (`0.57.1.p1` is the first
+hyprland-plus release on Hyprland 0.57.1). `hyprland --version` prints both.
 
 The code rules in `AGENTS.md` apply here too (clang-format, naming, `SP`/`UP`/`WP`, `sc<>`/`rc<>`, no braces on
 single-line if/else, tests for testable code). Its issue and PR rules are about the upstream hyprwm projects: never

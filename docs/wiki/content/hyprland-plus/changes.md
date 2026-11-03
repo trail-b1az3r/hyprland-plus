@@ -3,16 +3,16 @@ weight: 20
 title: Changes from upstream
 ---
 
-hyprland-plus is Hyprland 0.57.0 (upstream tag `v0.57.0`) with the changes below. Everything else is upstream.
+hyprland-plus is Hyprland 0.57.1 (upstream tag `v0.57.1`) with the changes below. Everything else is upstream.
 
 ## Behaviour that differs
 
-| Area | Upstream 0.57.0 | hyprland-plus |
+| Area | Upstream 0.57.1 | hyprland-plus |
 |---|---|---|
 | Dragging a tiled window that floats | Centres it on the cursor (`binds:drag_center_window`, on) | Keeps the grab point: `binds:drag_keep_grab_point`, on, wins over `drag_center_window`. Set it to `false` to let `drag_center_window` decide. |
 | Tile under the cursor during a drag | Nothing | Tinted, showing the swap target. Off with `binds:drag_guide = false`. |
 | `SUPER + ALT + F` | Fullscreen | Still fullscreen. Fit to Neighbors is on `SUPER + CTRL + F` in the Halcyon dotfiles. |
-| `hyprland --version` | `Hyprland 0.57.0` | `hyprland-plus 0.57.0.p1 (Hyprland 0.57.0)`, from the `PLUS_VERSION` file |
+| `hyprland --version` | `Hyprland 0.57.1` | `hyprland-plus 0.57.1.p1 (Hyprland 0.57.1)`, from the `PLUS_VERSION` file |
 
 ## New in hyprland-plus
 

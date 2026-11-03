@@ -4,7 +4,7 @@
 
 # hyprland-plus
 
-Hyprland 0.57.0, with the Halcyon changes described below.
+Hyprland 0.57.1, with the Halcyon changes described below.
 
 <br>
 
@@ -57,11 +57,11 @@ says whether one is waiting (no sudo).
 Other distributions: build it by hand with the same steps. The AUR package is described in `packaging/aur/`.
 
 For Hyprland's own documentation, see the [configuration guide](https://wiki.hypr.land/configuring/). It applies here,
-because this is Hyprland 0.57.0 with additions.
+because this is Hyprland 0.57.1 with additions.
 
 # What this fork adds
 
-This is Hyprland 0.57.0 (upstream tag `v0.57.0`) with the changes below.
+This is Hyprland 0.57.1 (upstream tag `v0.57.1`) with the changes below.
 
 ## Dragging a tiled window: `binds:drag_keep_grab_point`
 
@@ -172,6 +172,21 @@ hl.bind("SUPER + ALT + Right", hl.dsp.window.resize_edge({ edge = "right", amoun
 Source: `plustile` in `src/desktop/rule/windowRule/`, `resizeEdge` in `src/config/shared/actions/ConfigActions.cpp`,
 and `hl.dsp.window.resize_edge` in `src/config/lua/bindings/LuaBindingsDispatchers.cpp`.
 
+## New in 0.57.1.p1
+
+- **Based on Hyprland 0.57.1**, upstream's point release, with every hyprland-plus addition carried over: chord
+  keybinds that consume their keys correctly and no longer shadow mouse inputs, `max_bpc` set from a monitor's
+  configured bit depth, a session lock that survives an output being removed, dmabuf format feedback that follows
+  config changes (`quirks:skip_non_kms_dmabuf_formats` is now off by default upstream), fullscreen kept when a client
+  asks to maximize, small surfaces drawn at their logical size, group bar boxes rounded to match damage, a fix for
+  `r` workspace parsing, custom accel profiles accepted by the Lua validator, and wider limits for tablet values.
+- **Adaptive motion blur** (from 0.57.0.p3's branch): moves under 1.5 px skip the blur pass and slow moves take fewer
+  samples; `decoration:motion_blur:samples` is the most a frame uses.
+- **touchD**: `calibrate --apply` reads the snippet current iptsd versions write; the DKMS module is never built for a
+  kernel with its own IPTS driver (linux-surface), so it can no longer shadow it; the profile no longer turns every
+  finger off when a palm is seen; `touchdctl model`; status and doctor say whose driver is loaded and warn about
+  Secure Boot.
+
 ## New in 0.57.0.p3
 
 - **Window resistance**: `plus:window_resistance` makes a dragged floating window stop at the screen's edges and at
@@ -231,8 +246,8 @@ See [Desk](docs/wiki/content/hyprland-plus/desk.md) and [Mini windows](docs/wiki
 
 ## Version string
 
-`hyprland --version` reports `hyprland-plus 0.57.0.p3`, from the `PLUS_VERSION` file. The fork is based on upstream
-0.57.0, and `VERSION` keeps the numeric version that CMake needs. The binary and the config directory names are
+`hyprland --version` reports `hyprland-plus 0.57.1.p1`, from the `PLUS_VERSION` file. The fork is based on upstream
+0.57.1, and `VERSION` keeps the numeric version that CMake needs. The binary and the config directory names are
 unchanged, so existing configs and session files keep working.
 
 ## Logo
@@ -242,7 +257,7 @@ a small gold plus above and to the right of the wordmark.
 
 ## Status
 
-The maintained `main` branch is hyprland-plus 0.57.0.p3. The old `halcyon-0.56.2` branch is retained for older
+The maintained `main` branch is hyprland-plus 0.57.1.p1. The old `halcyon-0.56.2` branch is retained for older
 installations; new builds should use `main`. The build and live-session feature tests are still the release gate.
 
 # Features

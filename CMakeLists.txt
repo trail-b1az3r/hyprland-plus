@@ -157,7 +157,8 @@ if(NOT CMAKE_SYSTEM_NAME MATCHES "OpenBSD")
   endif()
 endif()
 
-set(AQUAMARINE_MINIMUM_VERSION 0.15.0)
+# hyprland-plus: 0.57.1 uses COutputState::setMaxBpc, new in Aquamarine 0.16.0 (upstream still says 0.15.0).
+set(AQUAMARINE_MINIMUM_VERSION 0.16.0)
 set(HYPRLANG_MINIMUM_VERSION 0.6.7)
 set(HYPRCURSOR_MINIMUM_VERSION 0.1.7)
 set(HYPRUTILS_MINIMUM_VERSION 0.14.3)
