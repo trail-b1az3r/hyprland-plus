@@ -11,7 +11,7 @@ pkgbase = hyprland-plus
 	makedepends = hyprland-protocols
 	makedepends = hyprwayland-scanner
 	makedepends = wayland-protocols
-	depends = aquamarine
+	depends = aquamarine>=0.15.1
 	depends = cairo
 	depends = hyprcursor
 	depends = hyprgraphics
