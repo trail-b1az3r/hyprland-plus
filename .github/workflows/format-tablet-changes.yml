@@ -37,12 +37,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          GIT_DIR="$(find /__w -maxdepth 5 -type d -name .git -print -quit)"
-          if [[ -z "$GIT_DIR" ]]; then
-            echo "::error::Checkout did not create a Git worktree under /__w."
+          REPO_NAME="${GITHUB_REPOSITORY##*/}"
+          REPO_DIR="/__w/$REPO_NAME/$REPO_NAME"
+          if [[ ! -d "$REPO_DIR/.git" ]]; then
+            echo "::error::Git worktree not found at $REPO_DIR"
+            ls -la "/__w/$REPO_NAME" || true
             exit 1
           fi
-          REPO_DIR="${GIT_DIR%/.git}"
           clang-format -i \
             "$REPO_DIR/src/managers/input/Tablets.cpp" \
             "$REPO_DIR/src/devices/Tablet.hpp" \
@@ -54,16 +55,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          GIT_DIR="$(find /__w -maxdepth 5 -type d -name .git -print -quit)"
-          if [[ -z "$GIT_DIR" ]]; then
-            echo "::error::Checkout did not create a Git worktree under /__w."
-            exit 1
-          fi
-          REPO_DIR="${GIT_DIR%/.git}"
-          if git -C "$REPO_DIR" diff --quiet -- \
-            src/managers/input/Tablets.cpp \
-            src/devices/Tablet.hpp \
-            tests/config/BlurVariants.cpp; then
+          REPO_NAME="${GITHUB_REPOSITORY##*/}"
+          REPO_DIR="/__w/$REPO_NAME/$REPO_NAME"
+          git -C "$REPO_DIR" rev-parse --show-toplevel
+          if git -C "$REPO_DIR" diff --quiet; then
             echo "The tablet files are already formatted."
             exit 0
           fi
