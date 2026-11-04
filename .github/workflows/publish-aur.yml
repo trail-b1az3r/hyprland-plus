@@ -54,10 +54,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docker run --rm \
-            -v "$RUNNER_TEMP/aur-package:/pkg" \
-            -w /pkg \
-            archlinux:base-devel \
+          docker run --rm \\
+            -v "$RUNNER_TEMP/aur-package:/pkg" \\
+            -w /pkg \\
+            archlinux:base-devel \\
             bash -euc 'useradd -m builder; chown -R builder:builder /pkg; su builder -c "makepkg --printsrcinfo > /pkg/.SRCINFO"'
           test -s "$RUNNER_TEMP/aur-package/.SRCINFO"
 
@@ -74,23 +74,36 @@ jobs:
           fi
           install -d -m 700 ~/.ssh
           # Accept multiline, escaped-newline, and base64-encoded GitHub secrets.
-          KEY_CONTENT="${AUR_SSH_PRIVATE_KEY//$'\r'/}"
-          if [[ "$KEY_CONTENT" == *'\n'* && "$KEY_CONTENT" != *$'\n'* ]]; then
-            KEY_CONTENT="${KEY_CONTENT//\\n/$'\n'}"
+          KEY_CONTENT="${AUR_SSH_PRIVATE_KEY//$'\\r'/}"
+          if [[ "$KEY_CONTENT" == *'\\n'* && "$KEY_CONTENT" != *$'\\n'* ]]; then
+            KEY_CONTENT="${KEY_CONTENT//\\\\n/$'\\n'}"
           fi
           if [[ "$KEY_CONTENT" != *"-----BEGIN "* ]]; then
             DECODED_KEY="$(printf '%s' "$KEY_CONTENT" | base64 --decode 2>/dev/null || true)"
             if [[ "$DECODED_KEY" == *"-----BEGIN "* ]]; then KEY_CONTENT="$DECODED_KEY"; fi
           fi
-          printf '%s\n' "$KEY_CONTENT" > ~/.ssh/aur
+          printf '%s\\n' "$KEY_CONTENT" > ~/.ssh/aur
           chmod 600 ~/.ssh/aur
-          if ! ssh-keygen -y -f ~/.ssh/aur >/dev/null 2>&1; then
-            echo "::error::AUR_SSH_PRIVATE_KEY is not a readable private key. Store the full multiline key, escaped-newline key, or base64-encoded private key in the repository secret."
+          if ! ssh-keygen -y -f ~/.ssh/aur > "$RUNNER_TEMP/aur-public-key.pub" 2> "$RUNNER_TEMP/aur-key-error"; then
+            echo "::error::AUR_SSH_PRIVATE_KEY is not a readable private key. Check the secret formatting."
+            cat "$RUNNER_TEMP/aur-key-error"
             exit 1
           fi
+
+          # A fingerprint is safe to log; never print the private key.
+          echo "GitHub Actions AUR key fingerprint:"
+          ssh-keygen -lf "$RUNNER_TEMP/aur-public-key.pub"
+
           ssh-keyscan -t ed25519 aur.archlinux.org >> ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
-          export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/aur -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes"
+          export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/aur -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes"
+
+          # Authenticate before cloning so an AUR key rejection is clearly isolated.
+          if ! ssh -T aur@aur.archlinux.org; then
+            echo "::error::AUR rejected the SSH key from AUR_SSH_PRIVATE_KEY. Compare the fingerprint above with the key registered in your AUR account."
+            exit 1
+          fi
+
           git clone ssh://aur@aur.archlinux.org/hyprland-plus.git "$RUNNER_TEMP/aur-repo"
           cp "$RUNNER_TEMP/aur-package/PKGBUILD" "$RUNNER_TEMP/aur-repo/PKGBUILD"
           cp "$RUNNER_TEMP/aur-package/.SRCINFO" "$RUNNER_TEMP/aur-repo/.SRCINFO"
