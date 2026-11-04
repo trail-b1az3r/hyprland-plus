@@ -44,7 +44,7 @@ jobs:
             exit 1
           }
           sed -i -E "s/^pkgver=.*/pkgver=$VERSION/" packaging/aur/PKGBUILD
-          sed -i -E "s|(hyprland-plus::git\\+https://github.com/trail-b1az3r/hyprland-plus.git#commit=)[0-9a-f]+|\\1$RELEASE_SHA|" packaging/aur/PKGBUILD
+          sed -i -E "s|(hyprland-plus::git\+https://github.com/trail-b1az3r/hyprland-plus.git#commit=)[0-9a-f]+|\1$RELEASE_SHA|" packaging/aur/PKGBUILD
           grep -q "commit=$RELEASE_SHA" packaging/aur/PKGBUILD
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           mkdir -p "$RUNNER_TEMP/aur-package"
@@ -54,10 +54,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docker run --rm \\
-            -v "$RUNNER_TEMP/aur-package:/pkg" \\
-            -w /pkg \\
-            archlinux:base-devel \\
+          docker run --rm \
+            -v "$RUNNER_TEMP/aur-package:/pkg" \
+            -w /pkg \
+            archlinux:base-devel \
             bash -euc 'useradd -m builder; chown -R builder:builder /pkg; su builder -c "makepkg --printsrcinfo > /pkg/.SRCINFO"'
           test -s "$RUNNER_TEMP/aur-package/.SRCINFO"
 
@@ -74,15 +74,15 @@ jobs:
           fi
           install -d -m 700 ~/.ssh
           # Accept multiline, escaped-newline, and base64-encoded GitHub secrets.
-          KEY_CONTENT="${AUR_SSH_PRIVATE_KEY//$'\\r'/}"
-          if [[ "$KEY_CONTENT" == *'\\n'* && "$KEY_CONTENT" != *$'\\n'* ]]; then
-            KEY_CONTENT="${KEY_CONTENT//\\\\n/$'\\n'}"
+          KEY_CONTENT="${AUR_SSH_PRIVATE_KEY//$'\r'/}"
+          if [[ "$KEY_CONTENT" == *'\n'* && "$KEY_CONTENT" != *$'\n'* ]]; then
+            KEY_CONTENT="${KEY_CONTENT//\\n/$'\n'}"
           fi
           if [[ "$KEY_CONTENT" != *"-----BEGIN "* ]]; then
             DECODED_KEY="$(printf '%s' "$KEY_CONTENT" | base64 --decode 2>/dev/null || true)"
             if [[ "$DECODED_KEY" == *"-----BEGIN "* ]]; then KEY_CONTENT="$DECODED_KEY"; fi
           fi
-          printf '%s\\n' "$KEY_CONTENT" > ~/.ssh/aur
+          printf '%s\n' "$KEY_CONTENT" > ~/.ssh/aur
           chmod 600 ~/.ssh/aur
           if ! ssh-keygen -y -f ~/.ssh/aur > "$RUNNER_TEMP/aur-public-key.pub" 2> "$RUNNER_TEMP/aur-key-error"; then
             echo "::error::AUR_SSH_PRIVATE_KEY is not a readable private key. Check the secret formatting."
