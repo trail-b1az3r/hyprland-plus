@@ -90,19 +90,46 @@ jobs:
             exit 1
           fi
 
-          # A fingerprint is safe to log; never print the private key.
-          echo "GitHub Actions AUR key fingerprint:"
-          ssh-keygen -lf "$RUNNER_TEMP/aur-public-key.pub"
+          # The public half is safe to log (never the private key). AUR matches the whole public key line, not a
+          # fingerprint: this exact line belongs in AUR > My Account > SSH Public Key.
+          PUBLIC_KEY="$(cat "$RUNNER_TEMP/aur-public-key.pub")"
+          FINGERPRINT="$(ssh-keygen -lf "$RUNNER_TEMP/aur-public-key.pub")"
+          echo "Public key of AUR_SSH_PRIVATE_KEY (this whole line goes in AUR > My Account > SSH Public Key):"
+          echo "$PUBLIC_KEY"
+          echo "Fingerprint: $FINGERPRINT"
 
           ssh-keyscan -t ed25519 aur.archlinux.org >> ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
           export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/aur -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes"
 
-          # Authenticate before cloning so an AUR key rejection is clearly isolated.
-          if ! ssh -T aur@aur.archlinux.org; then
-            echo "::error::AUR rejected the SSH key from AUR_SSH_PRIVATE_KEY. Compare the fingerprint above with the key registered in your AUR account."
+          # Authenticate before cloning so an AUR key rejection is clearly isolated. This must offer ~/.ssh/aur
+          # (a bare `ssh -T` only tries ~/.ssh/id_*); `help` is a command AUR's git shell answers once logged in.
+          set +e
+          $GIT_SSH_COMMAND aur@aur.archlinux.org help > "$RUNNER_TEMP/aur-ssh.log" 2>&1
+          status=$?
+          set -e
+          if [[ $status -eq 255 ]] && grep -q "Permission denied" "$RUNNER_TEMP/aur-ssh.log"; then
+            cat "$RUNNER_TEMP/aur-ssh.log"
+            {
+              echo "## AUR refused the SSH key"
+              echo
+              echo "AUR has no account with this public key. In https://aur.archlinux.org/account (My Account),"
+              echo "paste this **whole line** into **SSH Public Key** (a fingerprint does not work), then save and re-run:"
+              echo
+              echo '```'
+              echo "$PUBLIC_KEY"
+              echo '```'
+              echo
+              echo "Fingerprint: \`$FINGERPRINT\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::AUR refused the key from AUR_SSH_PRIVATE_KEY. Its public key line (printed above and in the job summary) must be saved, whole, in AUR > My Account > SSH Public Key; a fingerprint there does not work."
+            exit 1
+          elif [[ $status -eq 255 ]]; then
+            cat "$RUNNER_TEMP/aur-ssh.log"
+            echo "::error::Could not reach aur.archlinux.org over SSH."
             exit 1
           fi
+          echo "AUR accepted the key."
 
           git clone ssh://aur@aur.archlinux.org/hyprland-plus.git "$RUNNER_TEMP/aur-repo"
           cp "$RUNNER_TEMP/aur-package/PKGBUILD" "$RUNNER_TEMP/aur-repo/PKGBUILD"
