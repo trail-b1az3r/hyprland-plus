@@ -157,7 +157,7 @@ if(NOT CMAKE_SYSTEM_NAME MATCHES "OpenBSD")
   endif()
 endif()
 
-# hyprland-plus: 0.57.1 uses COutputState::setMaxBpc, new in Aquamarine 0.16.0 (upstream still says 0.15.0).
+# hyprland-plus: 0.57.x uses COutputState::setMaxBpc, new in Aquamarine 0.16.0 (upstream still says 0.15.0).
 set(AQUAMARINE_MINIMUM_VERSION 0.16.0)
 set(HYPRLANG_MINIMUM_VERSION 0.6.7)
 set(HYPRCURSOR_MINIMUM_VERSION 0.1.7)
@@ -390,13 +390,8 @@ if(NOT HAS_INOTIFY AND inotify_FOUND)
   target_link_libraries(hyprland_lib PUBLIC PkgConfig::inotify)
 endif()
 
-# sdbus-c++ is used to ask rtkit for realtime scheduling which is Linux-only
-if(NO_RTKIT OR NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  message(STATUS "rtkit realtime scheduling is disabled!")
-else()
-  pkg_check_modules(sdbus_dep REQUIRED IMPORTED_TARGET sdbus-c++>=2.0.0)
-  target_link_libraries(hyprland_lib PUBLIC PkgConfig::sdbus_dep)
-  add_compile_definitions(HAS_RTKIT)
+if(DEFINED NO_RTKIT)
+  message(STATUS "NO_RTKIT=${NO_RTKIT} is obsolete: Hyprland no longer acquires realtime scheduling")
 endif()
 
 if(NO_XWAYLAND)
@@ -755,7 +750,7 @@ if(BUILD_TESTING)
   enable_testing()
   add_custom_target(tests)
 
-  add_dependencies(tests hyprland_gtests)
+  add_dependencies(tests hyprland_gtests start-hyprland)
 
 else()
   message(STATUS "Testing is disabled")

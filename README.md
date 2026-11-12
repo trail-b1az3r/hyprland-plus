@@ -4,7 +4,7 @@
 
 # hyprland-plus
 
-Hyprland 0.57.1, with the Halcyon changes described below.
+Hyprland 0.57.2, with the Halcyon changes described below.
 
 <br>
 
@@ -57,11 +57,11 @@ says whether one is waiting (no sudo).
 Other distributions: build it by hand with the same steps. The AUR package is described in `packaging/aur/`.
 
 For Hyprland's own documentation, see the [configuration guide](https://wiki.hypr.land/configuring/). It applies here,
-because this is Hyprland 0.57.1 with additions.
+because this is Hyprland 0.57.2 with additions.
 
 # What this fork adds
 
-This is Hyprland 0.57.1 (upstream tag `v0.57.1`) with the changes below.
+This is Hyprland 0.57.2 (upstream tag `v0.57.2`) with the changes below.
 
 ## Dragging a tiled window: `binds:drag_keep_grab_point`
 
@@ -172,6 +172,15 @@ hl.bind("SUPER + ALT + Right", hl.dsp.window.resize_edge({ edge = "right", amoun
 Source: `plustile` in `src/desktop/rule/windowRule/`, `resizeEdge` in `src/config/shared/actions/ConfigActions.cpp`,
 and `hl.dsp.window.resize_edge` in `src/config/lua/bindings/LuaBindingsDispatchers.cpp`.
 
+## New in 0.57.2.p1
+
+- **Based on Hyprland 0.57.2**, upstream's point release, with every hyprland-plus addition carried over: Hyprland no
+  longer asks rtkit for realtime scheduling (so it no longer needs sdbus-c++), `start-hyprland` reports a session that
+  ended on a signal, fixes for unpinning a window onto a special workspace, apps that ask for fullscreen through the
+  layout, floating dialogs keeping their place relative to their parent, scrolling-layout column widths after
+  fullscreen, damage artifacts between two overlapping floating windows, layers under fullscreen windows, remapped
+  modifiers in keybinds, expired windows held by Lua and subsurface teardown.
+
 ## New in 0.57.1.p1
 
 - **Based on Hyprland 0.57.1**, upstream's point release, with every hyprland-plus addition carried over: chord
@@ -246,8 +255,8 @@ See [Desk](docs/wiki/content/hyprland-plus/desk.md) and [Mini windows](docs/wiki
 
 ## Version string
 
-`hyprland --version` reports `hyprland-plus 0.57.1.p1`, from the `PLUS_VERSION` file. The fork is based on upstream
-0.57.1, and `VERSION` keeps the numeric version that CMake needs. The binary and the config directory names are
+`hyprland --version` reports `hyprland-plus 0.57.2.p1`, from the `PLUS_VERSION` file. The fork is based on upstream
+0.57.2, and `VERSION` keeps the numeric version that CMake needs. The binary and the config directory names are
 unchanged, so existing configs and session files keep working.
 
 ## Logo
@@ -257,7 +266,7 @@ a small gold plus above and to the right of the wordmark.
 
 ## Status
 
-The maintained `main` branch is hyprland-plus 0.57.1.p1. The old `halcyon-0.56.2` branch is retained for older
+The maintained `main` branch is hyprland-plus 0.57.2.p1. The old `halcyon-0.56.2` branch is retained for older
 installations; new builds should use `main`. The build and live-session feature tests are still the release gate.
 
 # Features
