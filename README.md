@@ -172,6 +172,12 @@ hl.bind("SUPER + ALT + Right", hl.dsp.window.resize_edge({ edge = "right", amoun
 Source: `plustile` in `src/desktop/rule/windowRule/`, `resizeEdge` in `src/config/shared/actions/ConfigActions.cpp`,
 and `hl.dsp.window.resize_edge` in `src/config/lua/bindings/LuaBindingsDispatchers.cpp`.
 
+## New in 0.57.2.p2
+
+- **The wall between monitors for tiled windows too.** Dragging a tiled window onto another monitor now makes that
+  monitor's edge bulge as the window goes over, and snap when it is far enough over (`monitorwall` and
+  `monitorwallbreak` events). A tiled window is not held at the wall: it still goes where the cursor drops it.
+
 ## New in 0.57.2.p1
 
 - **Based on Hyprland 0.57.2**, upstream's point release, with every hyprland-plus addition carried over: Hyprland no
@@ -255,7 +261,7 @@ See [Desk](docs/wiki/content/hyprland-plus/desk.md) and [Mini windows](docs/wiki
 
 ## Version string
 
-`hyprland --version` reports `hyprland-plus 0.57.2.p1`, from the `PLUS_VERSION` file. The fork is based on upstream
+`hyprland --version` reports `hyprland-plus 0.57.2.p2`, from the `PLUS_VERSION` file. The fork is based on upstream
 0.57.2, and `VERSION` keeps the numeric version that CMake needs. The binary and the config directory names are
 unchanged, so existing configs and session files keep working.
 
@@ -266,7 +272,7 @@ a small gold plus above and to the right of the wordmark.
 
 ## Status
 
-The maintained `main` branch is hyprland-plus 0.57.2.p1. The old `halcyon-0.56.2` branch is retained for older
+The maintained `main` branch is hyprland-plus 0.57.2.p2. The old `halcyon-0.56.2` branch is retained for older
 installations; new builds should use `main`. The build and live-session feature tests are still the release gate.
 
 # Features

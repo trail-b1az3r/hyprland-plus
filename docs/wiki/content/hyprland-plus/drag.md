@@ -87,7 +87,8 @@ Push on, and once the window would be this many pixels past the edge, the wall g
 Pull it back inside its monitor and the wall stands again. Edges with no monitor beyond them have no wall.
 
 - **Type:** integer, in pixels. **Default:** `120`. `0` turns the wall off.
-- Move drags of floating windows (and of tiled windows once they float for the drag) only.
+- Move drags only. A floating window is held at the wall; a tiled window goes where the cursor drops it, so it is
+  not held, but the other monitor's edge still bulges as it goes over, and snaps when it is far enough over.
 - While a window is held, the `monitorwall` [event](../../ipc/) says where it would come in on the other monitor, so
   a shell can draw the wall bulging there: `MONITORNAME,EDGE,START,LENGTH,STRENGTH`. `EDGE` is that monitor's edge
   (`left`, `right`, `top`, `bottom`), `START` and `LENGTH` where along it the window's side is, in the monitor's own

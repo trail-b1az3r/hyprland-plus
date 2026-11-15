@@ -277,7 +277,7 @@ static Plus::SRect wallRect(const CBox& box) {
 
 void CDragStateController::applyMonitorWall(Vector2D& pos, const Vector2D& size) {
     static auto PWALL = CConfigValue<Config::INTEGER>("plus:monitor_wall");
-    if (*PWALL <= 0 || m_draggingTiled)
+    if (*PWALL <= 0)
         return;
 
     const auto&              MONITORS = State::monitorState()->monitors();
@@ -303,7 +303,10 @@ void CDragStateController::applyMonitorWall(Vector2D& pos, const Vector2D& size)
     }
 
     const auto STEP = m_wall.step(WANTED, rects, *PWALL);
-    pos             = {STEP.x, STEP.y};
+    // A tiled window goes where the cursor drops it, so it is not held back: it only shows the wall (the bulge on the
+    // other monitor, deeper as it goes over, and the snap when it is far enough over).
+    if (!m_draggingTiled)
+        pos = {STEP.x, STEP.y};
 
     if (STEP.brokeThrough && !m_wallPushedOn.empty())
         IPC::Socket2::sock()->postEvent({.event = "monitorwallbreak", .data = m_wallPushedOn});

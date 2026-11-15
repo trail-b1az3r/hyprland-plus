@@ -12,7 +12,7 @@ hyprland-plus is Hyprland 0.57.2 (upstream tag `v0.57.2`) with the changes below
 | Dragging a tiled window that floats | Centres it on the cursor (`binds:drag_center_window`, on) | Keeps the grab point: `binds:drag_keep_grab_point`, on, wins over `drag_center_window`. Set it to `false` to let `drag_center_window` decide. |
 | Tile under the cursor during a drag | Nothing | Tinted, showing the swap target. Off with `binds:drag_guide = false`. |
 | `SUPER + ALT + F` | Fullscreen | Still fullscreen. Fit to Neighbors is on `SUPER + CTRL + F` in the Halcyon dotfiles. |
-| `hyprland --version` | `Hyprland 0.57.2` | `hyprland-plus 0.57.2.p1 (Hyprland 0.57.2)`, from the `PLUS_VERSION` file |
+| `hyprland --version` | `Hyprland 0.57.2` | `hyprland-plus 0.57.2.p2 (Hyprland 0.57.2)`, from the `PLUS_VERSION` file |
 
 ## New in hyprland-plus
 
@@ -26,7 +26,7 @@ hyprland-plus is Hyprland 0.57.2 (upstream tag `v0.57.2`) with the changes below
 - **Drag options**: `binds:drag_keep_grab_point`, `binds:drag_guide` and `binds:drag_fullscreen_edge` (drop a dragged
   window at the top of the screen to fullscreen it, off by default). See [Drag](../drag/).
 - **The wall between monitors** (0.56.2.p3): `plus:monitor_wall`, and the `monitorwall` and `monitorwallbreak`
-  events. See [Drag](../drag/).
+  events; tiled windows show it too, without being held (0.57.2.p2). See [Drag](../drag/).
 - **Window resistance** (0.57.0.p3): `plus:window_resistance`. See [Drag](../drag/).
 - **Adaptive motion blur** (0.57.0.p3): `decoration:motion_blur:samples` is now the most a frame uses. A move
   smaller than 1.5 px skips the blur pass, and slower moves take fewer samples (one per 6 px of travel, from 2).
