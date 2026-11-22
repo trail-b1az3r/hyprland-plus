@@ -88,7 +88,8 @@ Pull it back inside its monitor and the wall stands again. Edges with no monitor
 
 - **Type:** integer, in pixels. **Default:** `120`. `0` turns the wall off.
 - Move drags only. A floating window is held at the wall; a tiled window goes where the cursor drops it, so it is
-  not held, but the other monitor's edge still bulges as it goes over, and snaps when it is far enough over.
+  not held (unless `plus:hold_tiled` is on), but the other monitor's edge still bulges as it goes over, and snaps
+  when it is far enough over.
 - While a window is held, the `monitorwall` [event](../../ipc/) says where it would come in on the other monitor, so
   a shell can draw the wall bulging there: `MONITORNAME,EDGE,START,LENGTH,STRENGTH`. `EDGE` is that monitor's edge
   (`left`, `right`, `top`, `bottom`), `START` and `LENGTH` where along it the window's side is, in the monitor's own
@@ -97,4 +98,21 @@ Pull it back inside its monitor and the wall stands again. Edges with no monitor
 
 ```lua
 hl.config({ plus = { monitor_wall = 160 } })   -- a firmer wall
+```
+
+### Holding tiled windows too: `plus:hold_tiled`
+
+- **Type:** boolean. **Default:** `false`.
+- When enabled, the wall holds a dragged tiled window as it holds a floating one, and `plus:window_resistance` stops
+  it at the screen's edges (not at other windows' edges: other tiles are everywhere a tile is dragged). A tiled window
+  floats while it is dragged, so one let go while it is held drops back onto its own monitor.
+
+### A glide when it lets go: `plus:snap_glide`
+
+- **Type:** integer, in milliseconds. **Default:** `0` (the window jumps).
+- When the wall gives, or resistance lets a window go, the window glides to the cursor for this long with its
+  `windowsMove` animation, instead of jumping the pixels it was held back. Halcyon sets `180`.
+
+```lua
+hl.config({ plus = { hold_tiled = true, snap_glide = 180 } })
 ```

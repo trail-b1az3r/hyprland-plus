@@ -869,6 +869,8 @@ Category: `plus`. See [Plus Tiles](../../../hyprland-plus/plustile/).
 | window_resistance | A dragged floating window stops at the screen's edges and at other windows' edges on its workspace, and goes past one only once pushed this many pixels beyond it. Edges two monitors share are `monitor_wall`'s. See [Drag](../../../hyprland-plus/drag/). `0`: off | int | `0` | [0 - 400] |
 | max_fps | Draw each monitor at most this many times a second, to save power; frames asked for sooner are drawn at the next turn. Halcyon's super battery saver sets `12`. `0`: no limit | int | `0` | [0 - 1000] |
 | monitor_wall | How far, in pixels, a dragged window has to push past an edge shared with another monitor to go through; it is held there until then. `0`: no wall. See [Drag](../../../hyprland-plus/drag/) | int | `120` | [0 - 2000] |
+| hold_tiled | Whether `monitor_wall` and `window_resistance` hold dragged tiled windows too (resistance at the screen's edges only). A tiled window let go while held drops back onto its own monitor. See [Drag](../../../hyprland-plus/drag/) | bool | `false` | |
+| snap_glide | When the wall gives or resistance lets go, the dragged window glides to the cursor for this many milliseconds with its `windowsMove` animation instead of jumping. `0`: it jumps. See [Drag](../../../hyprland-plus/drag/) | int | `0` | [0 - 2000] |
 | min_width | Smallest width edge moves can make a tile or its neighbours | int | `120` | [16 - 8192] |
 | step | Edge move step, in pixels | int | `40` | [1 - 4000] |
 | step_coarse | Coarse edge move step, in pixels | int | `160` | [1 - 4000] |

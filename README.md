@@ -172,6 +172,15 @@ hl.bind("SUPER + ALT + Right", hl.dsp.window.resize_edge({ edge = "right", amoun
 Source: `plustile` in `src/desktop/rule/windowRule/`, `resizeEdge` in `src/config/shared/actions/ConfigActions.cpp`,
 and `hl.dsp.window.resize_edge` in `src/config/lua/bindings/LuaBindingsDispatchers.cpp`.
 
+## New in 0.57.2.p3
+
+- **Tiled windows held at the wall too.** With `plus:hold_tiled`, the wall between monitors holds a dragged tiled
+  window as it holds a floating one, and `plus:window_resistance` stops it at the screen's edges (not at other tiles,
+  which are everywhere a tile is dragged). Let go while held and it drops back onto its own monitor. Off by default.
+- **A glide instead of a jump.** `plus:snap_glide` (milliseconds): when the wall gives or resistance lets go, the
+  window glides to the cursor with its move animation instead of jumping the pixels it was held back. `0` (the
+  default) keeps the jump.
+
 ## New in 0.57.2.p2
 
 - **The wall between monitors for tiled windows too.** Dragging a tiled window onto another monitor now makes that

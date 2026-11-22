@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include "../target/Target.hpp"
 #include "../../plus/MonitorWall.hpp"
 #include "../../managers/input/InputManager.hpp"
@@ -73,5 +74,11 @@ namespace Layout::Supplementary {
         void               applyMonitorWall(Vector2D& pos, const Vector2D& size);
         void               endMonitorWall();
         void               applyResistance(Vector2D& pos, const Vector2D& size);
+
+        // plus:snap_glide: when the wall or resistance lets go, the window glides to the cursor (its move animation)
+        // until this time instead of jumping there.
+        bool                                  m_resistHeld = false;
+        std::chrono::steady_clock::time_point m_glideUntil;
+        void                                  startGlide();
     };
 };

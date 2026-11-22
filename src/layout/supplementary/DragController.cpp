@@ -21,6 +21,7 @@
 #include "../../plus/Resistance.hpp"
 
 #include <hyprutils/utils/ScopeGuard.hpp>
+#include <cmath>
 #include <string_view>
 
 using namespace Layout;
@@ -304,12 +305,17 @@ void CDragStateController::applyMonitorWall(Vector2D& pos, const Vector2D& size)
 
     const auto STEP = m_wall.step(WANTED, rects, *PWALL);
     // A tiled window goes where the cursor drops it, so it is not held back: it only shows the wall (the bulge on the
-    // other monitor, deeper as it goes over, and the snap when it is far enough over).
-    if (!m_draggingTiled)
+    // other monitor, deeper as it goes over, and the snap when it is far enough over). plus:hold_tiled holds it too:
+    // it floats while dragged, so held at the edge it drops back onto its own monitor.
+    static auto PHOLDTILED = CConfigValue<Config::BOOL>("plus:hold_tiled");
+    if (!m_draggingTiled || *PHOLDTILED)
         pos = {STEP.x, STEP.y};
 
-    if (STEP.brokeThrough && !m_wallPushedOn.empty())
-        IPC::Socket2::sock()->postEvent({.event = "monitorwallbreak", .data = m_wallPushedOn});
+    if (STEP.brokeThrough) {
+        if (!m_wallPushedOn.empty())
+            IPC::Socket2::sock()->postEvent({.event = "monitorwallbreak", .data = m_wallPushedOn});
+        startGlide();
+    }
 
     if (!STEP.push) {
         endMonitorWall();
@@ -348,8 +354,11 @@ void CDragStateController::applyResistance(Vector2D& pos, const Vector2D& size) 
         monitors.push_back(wallRect(m->logicalBox()));
     }
 
+    // A tiled drag (plus:hold_tiled) stops at the screen's edges only: other tiles are everywhere it goes.
     std::vector<Plus::SRect> windows;
     for (const auto& w : Desktop::windowState()->windows()) {
+        if (m_draggingTiled)
+            break;
         if (!w || w == SELF || !w->mapped() || w->isHidden() || !w->m_workspace || !SELF || w->m_workspace != SELF->m_workspace)
             continue;
         windows.push_back(wallRect(w->getWindowMainSurfaceBox()));
@@ -357,7 +366,19 @@ void CDragStateController::applyResistance(Vector2D& pos, const Vector2D& size) 
 
     const auto PREVIOUS = TARGET->position();
     const auto R        = Plus::resist(wallRect(PREVIOUS), {.x = pos.x, .y = pos.y, .w = size.x, .h = size.y}, windows, monitors, *PRESIST);
-    pos                 = {R.x, R.y};
+    // Let go after being held: a jump of most of the resistance, which glides instead (plus:snap_glide).
+    if (m_resistHeld && !R.held && std::abs(R.x - PREVIOUS.x) + std::abs(R.y - PREVIOUS.y) > *PRESIST / 2.0)
+        startGlide();
+    m_resistHeld = R.held;
+    pos          = {R.x, R.y};
+}
+
+// hyprland-plus: plus:snap_glide. The next moves set the window's position without finishing its animation, so it
+// glides to the cursor with its move animation (windowsMove) instead of jumping the pixels it was held back.
+void CDragStateController::startGlide() {
+    static auto PGLIDE = CConfigValue<Config::INTEGER>("plus:snap_glide");
+    if (*PGLIDE > 0)
+        m_glideUntil = std::chrono::steady_clock::now() + std::chrono::milliseconds(*PGLIDE);
 }
 
 void CDragStateController::endMonitorWall() {
@@ -377,6 +398,8 @@ bool CDragStateController::dragEnd() {
     endMonitorWall();
     m_wall.end();
     m_wallStarted = false;
+    m_resistHeld  = false;
+    m_glideUntil  = {};
 
     m_mouseMoveEventCount = 1;
 
@@ -530,14 +553,17 @@ void CDragStateController::mouseMove(const Vector2D& mousePos) {
         if (*SNAPENABLED && !m_draggingTiled)
             g_layoutManager->performSnap(newPos, newSize, DRAGGINGTARGET, MBIND_MOVE, -1, m_beginDragSizeXY);
 
-        if (!m_draggingTiled)
+        static auto PHOLDTILED = CConfigValue<Config::BOOL>("plus:hold_tiled");
+        if (!m_draggingTiled || *PHOLDTILED)
             applyResistance(newPos, newSize);
         applyMonitorWall(newPos, newSize);
 
         newPos = newPos.round();
 
         DRAGGINGTARGET->setPositionGlobal({newPos, newSize});
-        DRAGGINGTARGET->warpPositionSize();
+        // hyprland-plus: while gliding (plus:snap_glide) the move animation runs on, retargeted at each move.
+        if (std::chrono::steady_clock::now() >= m_glideUntil)
+            DRAGGINGTARGET->warpPositionSize();
     } else if (isResizeMode(m_dragMode)) {
         if (DRAGGINGTARGET->floating()) {
 

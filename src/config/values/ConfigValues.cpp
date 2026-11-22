@@ -672,6 +672,15 @@ std::vector<SP<IValue>> Values::getConfigValues() {
                 "How hard a dragged window has to push, in pixels, to go onto another monitor: it stops at the shared edge like against something "
                 "elastic, and goes through once pushed this far past it (the monitorwall event says where, for the shell's bulge). 0: no wall.",
                 120, {.min = 0, .max = 2000}),
+        MS<Bool>("plus:hold_tiled",
+                 "If enabled, plus:monitor_wall and plus:window_resistance hold dragged tiled windows too (resistance at the screen's edges "
+                 "only, not at other tiles). A tiled window floats while dragged, so one let go while held drops back onto its own monitor. "
+                 "If disabled, a tiled drag only sends the wall's events, for the shell's bulge.",
+                 false),
+        MS<Int>("plus:snap_glide",
+                "When the monitor wall gives or resistance lets go, the dragged window glides to the cursor for this many milliseconds "
+                "(with its windowsMove animation) instead of jumping the pixels it was held back. 0: it jumps.",
+                0, {.min = 0, .max = 2000}),
         MS<Int>("superposition:edge", "Screen edge superposition windows tile to: 0 left, 1 right, 2 top, 3 bottom.", 1,
                 {.min = 0, .max = 3, .refresh = Supplementary::REFRESH_LAYOUTS}),
         MS<Float>("superposition:size", "Width (left/right) or height (top/bottom) of the superposition strip, as a fraction of the screen.", 0.12,
