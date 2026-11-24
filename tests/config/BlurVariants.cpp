@@ -22,10 +22,10 @@ TEST(Config, blurVariantsMatchRendererTypes) {
 
     EXPECT_EQ(INT_VALUE->defaultVal(), sc<Config::INTEGER>(eBlurType::BLUR_DUAL_KAWASE));
     EXPECT_EQ(*INT_VALUE->m_min, sc<Config::INTEGER>(eBlurType::BLUR_DUAL_KAWASE));
-    EXPECT_EQ(*INT_VALUE->m_max, sc<Config::INTEGER>(eBlurType::BLUR_HAZE));
+    EXPECT_EQ(*INT_VALUE->m_max, sc<Config::INTEGER>(eBlurType::BLUR_LIQUID));
 
     const auto& MAP = *INT_VALUE->m_map;
-    EXPECT_EQ(MAP.size(), 11);
+    EXPECT_EQ(MAP.size(), 12);
     EXPECT_EQ(MAP.at("kawase"), sc<Config::INTEGER>(eBlurType::BLUR_DUAL_KAWASE));
     EXPECT_EQ(MAP.at("frost"), sc<Config::INTEGER>(eBlurType::BLUR_FROST));
     EXPECT_FALSE(MAP.contains("fluted"));
@@ -39,6 +39,7 @@ TEST(Config, blurVariantsMatchRendererTypes) {
     EXPECT_EQ(MAP.at("acrylic"), sc<Config::INTEGER>(eBlurType::BLUR_ACRYLIC));
     EXPECT_EQ(MAP.at("aurora"), sc<Config::INTEGER>(eBlurType::BLUR_AURORA));
     EXPECT_EQ(MAP.at("haze"), sc<Config::INTEGER>(eBlurType::BLUR_HAZE));
+    EXPECT_EQ(MAP.at("liquid"), sc<Config::INTEGER>(eBlurType::BLUR_LIQUID));
     EXPECT_EQ(INT_VALUE->refreshBits(), Config::Supplementary::REFRESH_BLUR_FB);
 }
 

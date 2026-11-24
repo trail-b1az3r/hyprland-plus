@@ -36,6 +36,12 @@ The mini windows, superposition windows, plustile windows, the drag grab-point f
 *What this fork adds*. The Halcyon desktop they are used in is built on end-4's illogical-impulse; see the
 dots repository's CREDITS.md.
 
+## MyGlass
+
+The `liquid` blur variant (`src/render/gl/blur/Liquid.cpp`, `src/render/shaders/glsl/liquidfinish.frag`) follows the
+glass model of [MyGlass](https://github.com/Sidharth7082/myglass), a Hyprland plugin, under its BSD 3-Clause licence,
+reproduced in `LICENSE-MyGlass`.
+
 ## Other projects that inspired Hyprland
 
 wlroots, tinywl, Sway, Vivarium, dwl and Wayfire, as listed in the README under *Special Thanks*.

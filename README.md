@@ -172,6 +172,16 @@ hl.bind("SUPER + ALT + Right", hl.dsp.window.resize_edge({ edge = "right", amoun
 Source: `plustile` in `src/desktop/rule/windowRule/`, `resizeEdge` in `src/config/shared/actions/ConfigActions.cpp`,
 and `hl.dsp.window.resize_edge` in `src/config/lua/bindings/LuaBindingsDispatchers.cpp`.
 
+## New in 0.57.2.p4
+
+- **Liquid glass.** A new blur variant, `decoration:blur:variant = liquid`, after
+  [MyGlass](https://github.com/Sidharth7082/myglass) (BSD-3-Clause): a thick glass slab over the blur. Its rim bends
+  the backdrop inward with coloured fringes, its middle swells a little, bright backdrops are dimmed so text on the
+  glass stays readable, and light catches the rim and the top edge. It is MyGlass's look as part of the renderer, not
+  a plugin: it works on windows and layers alike (bars, docks, menus), follows their rounding, takes its blur from
+  `decoration:blur`, and has no plugin to rebuild on every Hyprland update. Tuned with `decoration:blur:liquid:*`.
+  Other blur variants are unchanged.
+
 ## New in 0.57.2.p3
 
 - **Tiled windows held at the wall too.** With `plus:hold_tiled`, the wall between monitors holds a dragged tiled

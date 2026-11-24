@@ -240,7 +240,7 @@ std::vector<SP<IValue>> Values::getConfigValues() {
         MS<Int>("decoration:blur:variant", "set the blur variant. Blur variants enhance regular blur, but may increase GPU and CPU usage, significantly so if they are animated.",
                 0,
                 {.min = 0,
-                 .max = 10,
+                 .max = 11,
                  .map =
                      OptionMap{
                          {"kawase", 0},
@@ -254,6 +254,7 @@ std::vector<SP<IValue>> Values::getConfigValues() {
                          {"acrylic", 8},
                          {"aurora", 9},
                          {"haze", 10},
+                         {"liquid", 11},
                      },
                  .refresh = Supplementary::REFRESH_BLUR_FB}),
         MS<Int>("decoration:blur:size", "blur size (distance)", 8, {.min = 0, .max = 100, .refresh = Supplementary::REFRESH_BLUR_FB}),
@@ -303,6 +304,21 @@ std::vector<SP<IValue>> Values::getConfigValues() {
 
         MS<Float>("decoration:blur:haze:intensity", "strength of the haze pearlescent sheen", 0.35F, {.min = 0, .max = 1, .refresh = Supplementary::REFRESH_BLUR_FB}),
         MS<Float>("decoration:blur:haze:iridescence", "strength of the haze pearlescent color shift", 0.7F, {.min = 0, .max = 1, .refresh = Supplementary::REFRESH_BLUR_FB}),
+
+        MS<Float>("decoration:blur:liquid:refraction", "how far the liquid glass rim bends the backdrop inward, in pixels", 30.F,
+                  {.min = 0, .max = 64, .refresh = Supplementary::REFRESH_BLUR_FB}),
+        MS<Float>("decoration:blur:liquid:aberration", "colour fringing at the liquid glass rim", 0.5F, {.min = 0, .max = 1, .refresh = Supplementary::REFRESH_BLUR_FB}),
+        MS<Float>("decoration:blur:liquid:edge", "width of the liquid glass rim, as a fraction of the pane's shorter side", 0.06F,
+                  {.min = 0.01, .max = 0.5, .refresh = Supplementary::REFRESH_BLUR_FB}),
+        MS<Float>("decoration:blur:liquid:lens", "how much the middle of the liquid glass swells like a dome", 0.5F,
+                  {.min = 0, .max = 2, .refresh = Supplementary::REFRESH_BLUR_FB}),
+        MS<Float>("decoration:blur:liquid:fresnel", "light along the liquid glass rim", 0.6F, {.min = 0, .max = 2, .refresh = Supplementary::REFRESH_BLUR_FB}),
+        MS<Float>("decoration:blur:liquid:specular", "highlight along the liquid glass top edge", 0.8F, {.min = 0, .max = 2, .refresh = Supplementary::REFRESH_BLUR_FB}),
+        MS<Float>("decoration:blur:liquid:adaptive_dim", "how much liquid glass dims bright backdrops", 0.4F, {.min = 0, .max = 1, .refresh = Supplementary::REFRESH_BLUR_FB}),
+        MS<Float>("decoration:blur:liquid:adaptive_boost", "how much liquid glass lifts dark backdrops", 0.F, {.min = 0, .max = 1, .refresh = Supplementary::REFRESH_BLUR_FB}),
+        MS<Float>("decoration:blur:liquid:saturation", "colour of the backdrop through liquid glass (1: unchanged)", 0.8F,
+                  {.min = 0, .max = 2, .refresh = Supplementary::REFRESH_BLUR_FB}),
+        MS<Color>("decoration:blur:liquid:tint", "liquid glass tint. Alpha is how much of it.", 0x228899AA, {.refresh = Supplementary::REFRESH_BLUR_FB}),
 
         MS<Float>("decoration:blur:ripple:strength", "maximum refraction displacement of click ripples in pixels", 30.F,
                   {.min = 0, .max = 32, .refresh = Supplementary::REFRESH_BLUR_FB}),

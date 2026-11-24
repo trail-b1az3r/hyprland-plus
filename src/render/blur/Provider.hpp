@@ -34,6 +34,7 @@ namespace Render {
         BLUR_ACRYLIC      = 8,
         BLUR_AURORA       = 9,
         BLUR_HAZE         = 10,
+        BLUR_LIQUID       = 11,
     };
 
     // "Jaki kurwa provident????"

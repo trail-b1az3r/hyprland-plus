@@ -188,6 +188,7 @@ Available variants:
 - `frost` - cracked ice
 - `haze` - a different diffused effect
 - `heat_shimmer` - a small shimmer with aberration
+- `liquid` - a thick slab of liquid glass, after MyGlass
 - `prism` - triangular refraction mask
 - `ripple` - ripple on click
 - `water` - ripple done with a heightmap
@@ -261,6 +262,27 @@ Category: `decoration.blur.haze`
 | --- | --- | --- | --- | --- |
 | intensity | Strength of the haze pearlescent sheen | float | `0.35` | [0.0 - 1.0] |
 | iridescence | Strength of the haze pearlescent color shift | float | `0.7` | [0.0 - 1.0] |
+
+###### Liquid
+
+Used by: `liquid`  
+Category: `decoration.blur.liquid`
+
+After [MyGlass](https://github.com/Sidharth7082/myglass) (BSD-3-Clause). The glass takes its blur from `decoration:blur`
+(`size`, `passes`, `brightness`, `contrast`, `vibrancy`); these shape the slab over it.
+
+| Name | Description | Type | Default | Limits |
+| --- | --- | --- | --- | --- |
+| adaptive_boost | How much liquid glass lifts dark backdrops | float | `0.0` | [0.0 - 1.0] |
+| adaptive_dim | How much liquid glass dims bright backdrops | float | `0.4` | [0.0 - 1.0] |
+| aberration | Colour fringing at the liquid glass rim | float | `0.5` | [0.0 - 1.0] |
+| edge | Width of the liquid glass rim, as a fraction of the pane's shorter side | float | `0.06` | [0.01 - 0.5] |
+| fresnel | Light along the liquid glass rim | float | `0.6` | [0.0 - 2.0] |
+| lens | How much the middle of the liquid glass swells like a dome | float | `0.5` | [0.0 - 2.0] |
+| refraction | How far the liquid glass rim bends the backdrop inward, in pixels | float | `30.0` | [0.0 - 64.0] |
+| saturation | Colour of the backdrop through liquid glass (1: unchanged) | float | `0.8` | [0.0 - 2.0] |
+| specular | Highlight along the liquid glass top edge | float | `0.8` | [0.0 - 2.0] |
+| tint | Liquid glass tint. Alpha is how much of it. | color | `0x228899AA` | |
 
 ###### Heat shimmer
 

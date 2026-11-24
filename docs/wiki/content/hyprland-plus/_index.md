@@ -20,6 +20,6 @@ directories and IPC, so existing configs and session files keep working. The add
 | Desk | [Desk](desk/) | Desktop peek, locate pointer (and shake to find), and windows that hold focus, for games. |
 | Mini all | [Mini windows](mini-windows/) | Every window on the workspace shrinks to a mini window in a row along the bottom, and back. |
 | `hyprctl dots`, `store`, `load` | [hyprctl](hyprctl/) | Installs dot sets, and saves and loads them as `.dhyprsave` files. |
-| Version string | [Changes](changes/) | `hyprland --version` reports `hyprland-plus 0.57.2.p3`. |
+| Version string | [Changes](changes/) | `hyprland --version` reports `hyprland-plus 0.57.2.p4`. |
 
 Start with [Install](install/). The list of every difference from upstream is on [Changes from upstream](changes/).

@@ -2,6 +2,7 @@
 #include <render/Context.hpp>
 #include <render/gl/blur/Aurora.hpp>
 #include <render/gl/blur/Kawase.hpp>
+#include <render/gl/blur/Liquid.hpp>
 #include <render/gl/blur/Glass.hpp>
 #include <render/gl/blur/FluidJar.hpp>
 #include <render/gl/blur/HeatShimmer.hpp>
@@ -75,6 +76,20 @@ TEST(BlurMaterial, HazeUsesStaticPearlescentFinish) {
     EXPECT_FALSE(haze.isAnimated(ctx));
     EXPECT_EQ(haze.blurSizeForDamage(100), 40);
     EXPECT_FLOAT_EQ(haze.sampleRadius(), 0.F);
+}
+
+TEST(BlurMaterial, LiquidSamplesInsideThePane) {
+    Render::CRenderContext    ctx;
+    const CLiquidBlurMaterial liquid;
+    const auto                requirements = liquid.requirements();
+
+    EXPECT_EQ(liquid.type(), Render::eBlurType::BLUR_LIQUID);
+    EXPECT_EQ(requirements.finishFragment, Render::SH_FRAG_LIQUIDFINISH);
+    EXPECT_FALSE(requirements.preparedInput);
+    EXPECT_FALSE(requirements.liveBlur);
+    EXPECT_FALSE(liquid.isAnimated(ctx));
+    // It bends the backdrop inward only, so it needs nothing beyond the blur's own reach.
+    EXPECT_FLOAT_EQ(liquid.sampleRadius(), 0.F);
 }
 
 TEST(BlurMaterial, AcrylicUsesPreparedLiveFinish) {
