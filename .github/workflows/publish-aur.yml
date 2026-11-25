@@ -44,10 +44,26 @@ jobs:
 
           mkdir -p "$RUNNER_TEMP/aur-packages/hyprland-plus" "$RUNNER_TEMP/aur-packages/oh-hyprland-plus"
           cp packaging/aur/PKGBUILD "$RUNNER_TEMP/aur-packages/hyprland-plus/PKGBUILD"
-          cp packaging/aur/oh-hyprland-plus/PKGBUILD "$RUNNER_TEMP/aur-packages/oh-hyprland-plus/PKGBUILD"
+          git fetch origin main:refs/remotes/origin/main
+          git show origin/main:packaging/aur/oh-hyprland-plus/PKGBUILD > "$RUNNER_TEMP/aur-packages/oh-hyprland-plus/PKGBUILD"
+          python3 - packaging/aur/PKGBUILD "$RUNNER_TEMP/aur-packages/oh-hyprland-plus/PKGBUILD" <<'PY'
+          import pathlib, re, sys
+          source = pathlib.Path(sys.argv[1]).read_text()
+          target_path = pathlib.Path(sys.argv[2])
+          target = target_path.read_text()
+          depends = re.search(r"(?ms)^depends=\(.*?^\)", source)
+          if not depends:
+              raise SystemExit("Could not copy runtime dependencies from the release PKGBUILD")
+          target = re.sub(r"(?ms)^depends=\(.*?^\)", depends.group(0), target, count=1)
+          target_path.write_text(target)
+          PY
 
           sed -i -E "s/^pkgver=.*/pkgver=$VERSION/" "$RUNNER_TEMP/aur-packages/hyprland-plus/PKGBUILD"
-          sed -i -E "s|(hyprland-plus::git\+https://github.com/trail-b1az3r/hyprland-plus.git#commit=)[0-9a-f]+|\1$RELEASE_SHA|" "$RUNNER_TEMP/aur-packages/hyprland-plus/PKGBUILD"
+          if grep -q 'hyprland-plus::git+' "$RUNNER_TEMP/aur-packages/hyprland-plus/PKGBUILD"; then
+            sed -i -E "s|(hyprland-plus::git\+https://github.com/trail-b1az3r/hyprland-plus.git#commit=)[0-9a-f]+|\1$RELEASE_SHA|" "$RUNNER_TEMP/aur-packages/hyprland-plus/PKGBUILD"
+          else
+            sed -i -E "s|#branch=[^\" ]+|#commit=$RELEASE_SHA|" "$RUNNER_TEMP/aur-packages/hyprland-plus/PKGBUILD"
+          fi
           sed -i -E "s/^pkgver=.*/pkgver=$VERSION/" "$RUNNER_TEMP/aur-packages/oh-hyprland-plus/PKGBUILD"
           grep -q "commit=$RELEASE_SHA" "$RUNNER_TEMP/aur-packages/hyprland-plus/PKGBUILD"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
