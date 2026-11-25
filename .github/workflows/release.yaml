@@ -80,8 +80,11 @@ jobs:
             -v "$GITHUB_WORKSPACE:/src" \
             -v "$RUNNER_TEMP/arch-packages:/out" \
             archlinux:base-devel bash -euc '
-              pacman -Syu --noconfirm
+              pacman -Syu --noconfirm sudo
               useradd -m builder
+              install -d -m 0750 /etc/sudoers.d
+              printf 'builder ALL=(ALL) NOPASSWD: ALL\\n' > /etc/sudoers.d/builder
+              chmod 0440 /etc/sudoers.d/builder
               chown -R builder:builder /src /out
               su builder -c "cd /src/packaging/aur && makepkg --syncdeps --noconfirm --cleanbuild"
               cp /src/packaging/aur/*.pkg.tar.zst /out/
