@@ -28,5 +28,4 @@ package() {
   bsdtar -xpf "$srcdir/hyprland-plus-${pkgver}-x86_64.pkg.tar.zst" \
     -C "$pkgdir" \
     --exclude='.PKGINFO' --exclude='.BUILDINFO' --exclude='.MTREE'
-  install -Dm644 "$srcdir/hyprland-plus/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE" 2>/dev/null || true
 }
