@@ -105,7 +105,7 @@ jobs:
             cd "$work"
             git config user.name "Hyprland Plus Release Bot"
             git config user.email "$AUR_COMMIT_EMAIL"
-            if git diff --quiet; then
+            if git diff --quiet && [[ -z "$(git ls-files --others --exclude-standard)" ]]; then
               echo "$package is already up to date."
               continue
             fi
