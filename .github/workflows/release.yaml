@@ -4,61 +4,94 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to build artifacts for (for example v0.57.2.p4)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-artifacts-${{ github.event.release.tag_name || inputs.tag || github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  source-tarball:
+  artifacts:
+    name: Build and attach release artifacts
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Resolve release tag
+        id: release
+        shell: bash
+        env:
+          EVENT_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          TAG="${EVENT_TAG:-$INPUT_TAG}"
+          if [[ -z "$TAG" ]]; then
+            echo "::error::A release event tag or manual tag input is required."
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Check out release source and submodules
         uses: actions/checkout@v6
         with:
+          ref: ${{ steps.release.outputs.tag }}
           fetch-depth: 0
           submodules: recursive
 
-      - name: Populate git info in version.h.in
+      - name: Verify release version
+        shell: bash
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
         run: |
-          git fetch --tags --unshallow || true
+          set -euo pipefail
+          VERSION="${TAG#v}"
+          EXPECTED="$(tr -d '[:space:]' < PLUS_VERSION)"
+          if [[ "$VERSION" != "$EXPECTED" ]]; then
+            echo "::error::Tag $TAG does not match PLUS_VERSION ($EXPECTED)."
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
-          COMMIT_HASH=$(git rev-parse HEAD)
-          BRANCH="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD)}"
-          COMMIT_MSG=$(git show -s --format=%s | sed 's/[&/]/\\&/g')
-          COMMIT_DATE=$(git show -s --format=%cd --date=local)
-          GIT_DIRTY=$(git diff-index --quiet HEAD -- && echo "clean" || echo "dirty")
-          GIT_TAG=$(git describe --tags --always || echo "unknown")
-          GIT_COMMITS=$(git rev-list --count HEAD)
+      - name: Create source archive
+        run: scripts/release-source.sh "hyprland-plus-$VERSION" "$RUNNER_TEMP/release"
 
-          echo "Branch: $BRANCH"
-          echo "Tag: $GIT_TAG"
-
-          sed -i \
-            -e "s|@GIT_COMMIT_HASH@|$COMMIT_HASH|" \
-            -e "s|@GIT_BRANCH@|$BRANCH|" \
-            -e "s|@GIT_COMMIT_MESSAGE@|$COMMIT_MSG|" \
-            -e "s|@GIT_COMMIT_DATE@|$COMMIT_DATE|" \
-            -e "s|@GIT_DIRTY@|$GIT_DIRTY|" \
-            -e "s|@GIT_TAG@|$GIT_TAG|" \
-            -e "s|@GIT_COMMITS@|$GIT_COMMITS|" \
-            src/version.h.in
-
-      - name: Create tarball with submodules
-        id: tar
+      - name: Build precompiled Arch package
+        shell: bash
         run: |
-          mkdir hyprland-source; mv ./* ./hyprland-source || tar -czv --owner=0 --group=0 --no-same-owner --no-same-permissions -f source.tar.gz *
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/arch-packages"
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/src" \
+            -v "$RUNNER_TEMP/arch-packages:/out" \
+            -w /src \
+            archlinux:base-devel bash -euc '
+              pacman -Syu --noconfirm
+              useradd -m builder
+              chown -R builder:builder /src /out
+              su builder -c "makepkg --syncdeps --noconfirm --cleanbuild"
+              cp /src/*.pkg.tar.zst /out/
+            '
+          PACKAGE="$(find "$RUNNER_TEMP/arch-packages" -maxdepth 1 -name 'hyprland-plus-*.pkg.tar.zst' -print -quit)"
+          test -n "$PACKAGE"
+          cp "$PACKAGE" "$RUNNER_TEMP/release/hyprland-plus-$VERSION-x86_64.pkg.tar.zst"
 
-      - id: whatrelease
-        name: Get latest release
-        uses: pozetroninc/github-action-get-latest-release@master
-        with:
-          owner: hyprwm
-          repo: Hyprland
-          excludes: prerelease, draft
-
-      - name: Upload to release
-        id: upload
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: source.tar.gz
-          asset_name: source-${{ steps.whatrelease.outputs.release }}.tar.gz
-          tag: ${{ steps.whatrelease.outputs.release }}
-          overwrite: true
+      - name: Upload artifacts to this repository's release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" >/dev/null
+          gh release upload "$TAG" \
+            "$RUNNER_TEMP/release/hyprland-plus-$VERSION.tar.gz" \
+            "$RUNNER_TEMP/release/hyprland-plus-$VERSION.tar.gz.sha256" \
+            "$RUNNER_TEMP/release/hyprland-plus-$VERSION-x86_64.pkg.tar.zst" \
+            --clobber
