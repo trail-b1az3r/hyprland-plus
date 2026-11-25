@@ -42,11 +42,11 @@ jobs:
             exit 1
           }
 
-          mkdir -p "$RUNNER_TEMP/aur-packages/hyprland-plus" "$RUNNER_TEMP/aur-packages/oh-hyprland-plus"
+          mkdir -p "$RUNNER_TEMP/aur-packages/hyprland-plus" "$RUNNER_TEMP/aur-packages/hyprland-plus-bin"
           cp packaging/aur/PKGBUILD "$RUNNER_TEMP/aur-packages/hyprland-plus/PKGBUILD"
           git fetch origin main:refs/remotes/origin/main
-          git show origin/main:packaging/aur/oh-hyprland-plus/PKGBUILD > "$RUNNER_TEMP/aur-packages/oh-hyprland-plus/PKGBUILD"
-          python3 - packaging/aur/PKGBUILD "$RUNNER_TEMP/aur-packages/oh-hyprland-plus/PKGBUILD" <<'PY'
+          git show origin/main:packaging/aur/hyprland-plus-bin/PKGBUILD > "$RUNNER_TEMP/aur-packages/hyprland-plus-bin/PKGBUILD"
+          python3 - packaging/aur/PKGBUILD "$RUNNER_TEMP/aur-packages/hyprland-plus-bin/PKGBUILD" <<'PY'
           import pathlib, re, sys
           source = pathlib.Path(sys.argv[1]).read_text()
           target_path = pathlib.Path(sys.argv[2])
@@ -64,7 +64,7 @@ jobs:
           else
             sed -i -E "s|#branch=[^\" ]+|#commit=$RELEASE_SHA|" "$RUNNER_TEMP/aur-packages/hyprland-plus/PKGBUILD"
           fi
-          sed -i -E "s/^pkgver=.*/pkgver=$VERSION/" "$RUNNER_TEMP/aur-packages/oh-hyprland-plus/PKGBUILD"
+          sed -i -E "s/^pkgver=.*/pkgver=$VERSION/" "$RUNNER_TEMP/aur-packages/hyprland-plus-bin/PKGBUILD"
           grep -q "commit=$RELEASE_SHA" "$RUNNER_TEMP/aur-packages/hyprland-plus/PKGBUILD"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
@@ -113,7 +113,7 @@ jobs:
           chmod 600 ~/.ssh/known_hosts
           export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/aur -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes"
 
-          for package in hyprland-plus oh-hyprland-plus; do
+          for package in hyprland-plus hyprland-plus-bin; do
             work="$RUNNER_TEMP/aur-repo-$package"
             git clone "ssh://aur@aur.archlinux.org/$package.git" "$work"
             cp "$RUNNER_TEMP/aur-packages/$package/PKGBUILD" "$work/PKGBUILD"
