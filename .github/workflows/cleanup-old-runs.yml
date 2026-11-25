@@ -1,0 +1,83 @@
+name: Cleanup old workflow runs
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_run:
+    workflows: ["*"]
+    types: [requested, in_progress, completed]
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: cleanup-old-workflow-runs
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    # Do not start another cleanup run in response to this workflow completing.
+    if: github.event_name != 'workflow_run' || github.event.workflow.name != 'Cleanup old workflow runs'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel runs older than the newest two for each workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+
+            const workflows = await github.paginate(
+              github.rest.actions.listRepoWorkflows,
+              { owner, repo, per_page: 100 }
+            );
+
+            let cancelled = 0;
+            let inspected = 0;
+
+            for (const workflow of workflows) {
+              const runs = await github.paginate(
+                github.rest.actions.listWorkflowRuns,
+                {
+                  owner,
+                  repo,
+                  workflow_id: workflow.id,
+                  per_page: 100
+                }
+              );
+
+              // Keep the two newest runs regardless of their status.
+              runs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+              for (const run of runs.slice(2)) {
+                inspected++;
+
+                // GitHub only allows cancellation of runs that are still active.
+                if (run.status !== "queued" && run.status !== "in_progress") {
+                  continue;
+                }
+
+                core.info(
+                  `Cancelling ${workflow.name} run #${run.run_number} (${run.html_url}); newer runs are being retained.`
+                );
+
+                try {
+                  await github.rest.actions.cancelWorkflowRun({
+                    owner,
+                    repo,
+                    run_id: run.id
+                  });
+                  cancelled++;
+                } catch (error) {
+                  // A run may finish between listing and cancellation.
+                  if (error.status === 409 || error.status === 422 || error.status === 404) {
+                    core.warning(`Could not cancel run ${run.id}: ${error.message}`);
+                  } else {
+                    throw error;
+                  }
+                }
+              }
+            }
+
+            core.info(`Cleanup complete. Checked ${inspected} older runs and cancelled ${cancelled} active run(s).`);
