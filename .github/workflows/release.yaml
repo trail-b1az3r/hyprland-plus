@@ -68,7 +68,12 @@ jobs:
         run: |
           set -euo pipefail
           RELEASE_SHA="$(git rev-parse HEAD)"
-          sed -i -E "s|(hyprland-plus::git\\+https://github.com/trail-b1az3r/hyprland-plus.git#commit=)[0-9a-f]+|\\1$RELEASE_SHA|" packaging/aur/PKGBUILD
+          sed -i -E "s/^pkgver=.*/pkgver=$VERSION/" packaging/aur/PKGBUILD
+          if grep -q 'hyprland-plus::git+' packaging/aur/PKGBUILD; then
+            sed -i -E "s|(hyprland-plus::git\\+https://github.com/trail-b1az3r/hyprland-plus.git#commit=)[0-9a-f]+|\\1$RELEASE_SHA|" packaging/aur/PKGBUILD
+          else
+            sed -i -E "s|#branch=[^\" ]+|#commit=$RELEASE_SHA|" packaging/aur/PKGBUILD
+          fi
           grep -q "commit=$RELEASE_SHA" packaging/aur/PKGBUILD
           mkdir -p "$RUNNER_TEMP/arch-packages"
           docker run --rm \
