@@ -1,4 +1,4 @@
-name: Publish hyprland-plus to AUR
+name: Publish hyprland-plus packages to AUR
 
 on:
   release:
@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   publish:
-    name: Update AUR package
+    name: Publish AUR packages
     runs-on: ubuntu-latest
     steps:
       - name: Check out the released source
@@ -23,7 +23,7 @@ jobs:
           ref: ${{ github.event.release.tag_name || github.sha }}
           fetch-depth: 0
 
-      - name: Validate release version and prepare PKGBUILD
+      - name: Validate release version and prepare both packages
         shell: bash
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
@@ -32,9 +32,7 @@ jobs:
           RELEASE_SHA="$(git rev-parse HEAD)"
           VERSION="${RELEASE_TAG#v}"
           EXPECTED="$(tr -d '[:space:]' < PLUS_VERSION)"
-          if [[ -z "$RELEASE_TAG" ]]; then
-            VERSION="$EXPECTED"
-          fi
+          if [[ -z "$RELEASE_TAG" ]]; then VERSION="$EXPECTED"; fi
           if [[ "$VERSION" != "$EXPECTED" ]]; then
             echo "::error::Release tag ($VERSION) does not match PLUS_VERSION ($EXPECTED)."
             exit 1
@@ -43,25 +41,33 @@ jobs:
             echo "::error::Invalid Arch pkgver: $VERSION"
             exit 1
           }
-          sed -i -E "s/^pkgver=.*/pkgver=$VERSION/" packaging/aur/PKGBUILD
-          sed -i -E "s|(hyprland-plus::git\+https://github.com/trail-b1az3r/hyprland-plus.git#commit=)[0-9a-f]+|\1$RELEASE_SHA|" packaging/aur/PKGBUILD
-          grep -q "commit=$RELEASE_SHA" packaging/aur/PKGBUILD
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          mkdir -p "$RUNNER_TEMP/aur-package"
-          cp packaging/aur/PKGBUILD "$RUNNER_TEMP/aur-package/PKGBUILD"
 
-      - name: Generate .SRCINFO with makepkg
+          mkdir -p "$RUNNER_TEMP/aur-packages/hyprland-plus" "$RUNNER_TEMP/aur-packages/oh-hyprland-plus"
+          cp packaging/aur/PKGBUILD "$RUNNER_TEMP/aur-packages/hyprland-plus/PKGBUILD"
+          cp packaging/aur/oh-hyprland-plus/PKGBUILD "$RUNNER_TEMP/aur-packages/oh-hyprland-plus/PKGBUILD"
+
+          sed -i -E "s/^pkgver=.*/pkgver=$VERSION/" "$RUNNER_TEMP/aur-packages/hyprland-plus/PKGBUILD"
+          sed -i -E "s|(hyprland-plus::git\+https://github.com/trail-b1az3r/hyprland-plus.git#commit=)[0-9a-f]+|\1$RELEASE_SHA|" "$RUNNER_TEMP/aur-packages/hyprland-plus/PKGBUILD"
+          sed -i -E "s/^pkgver=.*/pkgver=$VERSION/" "$RUNNER_TEMP/aur-packages/oh-hyprland-plus/PKGBUILD"
+          grep -q "commit=$RELEASE_SHA" "$RUNNER_TEMP/aur-packages/hyprland-plus/PKGBUILD"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Generate .SRCINFO for both packages
         shell: bash
         run: |
           set -euo pipefail
           docker run --rm \
-            -v "$RUNNER_TEMP/aur-package:/pkg" \
-            -w /pkg \
-            archlinux:base-devel \
-            bash -euc 'useradd -m builder; chown -R builder:builder /pkg; su builder -c "makepkg --printsrcinfo > /pkg/.SRCINFO"'
-          test -s "$RUNNER_TEMP/aur-package/.SRCINFO"
+            -v "$RUNNER_TEMP/aur-packages:/packages" \
+            archlinux:base-devel bash -euc '
+              useradd -m builder
+              chown -R builder:builder /packages
+              for dir in /packages/*; do
+                su builder -c "cd \"$dir\" && makepkg --printsrcinfo > .SRCINFO"
+                test -s "$dir/.SRCINFO"
+              done
+            '
 
-      - name: Publish to the AUR
+      - name: Publish both AUR repositories
         shell: bash
         env:
           AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
@@ -73,10 +79,9 @@ jobs:
             exit 1
           fi
           install -d -m 700 ~/.ssh
-          # Accept multiline, escaped-newline, and base64-encoded GitHub secrets.
           KEY_CONTENT="${AUR_SSH_PRIVATE_KEY//$'\r'/}"
-          if [[ "$KEY_CONTENT" == *'\n'* && "$KEY_CONTENT" != *$'\n'* ]]; then
-            KEY_CONTENT="${KEY_CONTENT//\\n/$'\n'}"
+          if [[ "$KEY_CONTENT" == *'\\n'* && "$KEY_CONTENT" != *$'\n'* ]]; then
+            KEY_CONTENT="${KEY_CONTENT//\\\\n/$'\n'}"
           fi
           if [[ "$KEY_CONTENT" != *"-----BEGIN "* ]]; then
             DECODED_KEY="$(printf '%s' "$KEY_CONTENT" | base64 --decode 2>/dev/null || true)"
@@ -84,63 +89,27 @@ jobs:
           fi
           printf '%s\n' "$KEY_CONTENT" > ~/.ssh/aur
           chmod 600 ~/.ssh/aur
-          if ! ssh-keygen -y -f ~/.ssh/aur > "$RUNNER_TEMP/aur-public-key.pub" 2> "$RUNNER_TEMP/aur-key-error"; then
-            echo "::error::AUR_SSH_PRIVATE_KEY is not a readable private key. Check the secret formatting."
-            cat "$RUNNER_TEMP/aur-key-error"
+          if ! ssh-keygen -y -f ~/.ssh/aur >/dev/null; then
+            echo "::error::AUR_SSH_PRIVATE_KEY is not a readable private key."
             exit 1
           fi
-
-          # The public half is safe to log (never the private key). AUR matches the whole public key line, not a
-          # fingerprint: this exact line belongs in AUR > My Account > SSH Public Key.
-          PUBLIC_KEY="$(cat "$RUNNER_TEMP/aur-public-key.pub")"
-          FINGERPRINT="$(ssh-keygen -lf "$RUNNER_TEMP/aur-public-key.pub")"
-          echo "Public key of AUR_SSH_PRIVATE_KEY (this whole line goes in AUR > My Account > SSH Public Key):"
-          echo "$PUBLIC_KEY"
-          echo "Fingerprint: $FINGERPRINT"
-
           ssh-keyscan -t ed25519 aur.archlinux.org >> ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
           export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/aur -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes"
 
-          # Authenticate before cloning so an AUR key rejection is clearly isolated. This must offer ~/.ssh/aur
-          # (a bare `ssh -T` only tries ~/.ssh/id_*); `help` is a command AUR's git shell answers once logged in.
-          set +e
-          $GIT_SSH_COMMAND aur@aur.archlinux.org help > "$RUNNER_TEMP/aur-ssh.log" 2>&1
-          status=$?
-          set -e
-          if [[ $status -eq 255 ]] && grep -q "Permission denied" "$RUNNER_TEMP/aur-ssh.log"; then
-            cat "$RUNNER_TEMP/aur-ssh.log"
-            {
-              echo "## AUR refused the SSH key"
-              echo
-              echo "AUR has no account with this public key. In https://aur.archlinux.org/account (My Account),"
-              echo "paste this **whole line** into **SSH Public Key** (a fingerprint does not work), then save and re-run:"
-              echo
-              echo '```'
-              echo "$PUBLIC_KEY"
-              echo '```'
-              echo
-              echo "Fingerprint: \`$FINGERPRINT\`"
-            } >> "$GITHUB_STEP_SUMMARY"
-            echo "::error::AUR refused the key from AUR_SSH_PRIVATE_KEY. Its public key line (printed above and in the job summary) must be saved, whole, in AUR > My Account > SSH Public Key; a fingerprint there does not work."
-            exit 1
-          elif [[ $status -eq 255 ]]; then
-            cat "$RUNNER_TEMP/aur-ssh.log"
-            echo "::error::Could not reach aur.archlinux.org over SSH."
-            exit 1
-          fi
-          echo "AUR accepted the key."
-
-          git clone ssh://aur@aur.archlinux.org/hyprland-plus.git "$RUNNER_TEMP/aur-repo"
-          cp "$RUNNER_TEMP/aur-package/PKGBUILD" "$RUNNER_TEMP/aur-repo/PKGBUILD"
-          cp "$RUNNER_TEMP/aur-package/.SRCINFO" "$RUNNER_TEMP/aur-repo/.SRCINFO"
-          cd "$RUNNER_TEMP/aur-repo"
-          git config user.name "Hyprland Plus Release Bot"
-          git config user.email "$AUR_COMMIT_EMAIL"
-          if git diff --quiet; then
-            echo "AUR package is already up to date."
-            exit 0
-          fi
-          git add PKGBUILD .SRCINFO
-          git commit -m "Update hyprland-plus to $VERSION"
-          git push origin master
+          for package in hyprland-plus oh-hyprland-plus; do
+            work="$RUNNER_TEMP/aur-repo-$package"
+            git clone "ssh://aur@aur.archlinux.org/$package.git" "$work"
+            cp "$RUNNER_TEMP/aur-packages/$package/PKGBUILD" "$work/PKGBUILD"
+            cp "$RUNNER_TEMP/aur-packages/$package/.SRCINFO" "$work/.SRCINFO"
+            cd "$work"
+            git config user.name "Hyprland Plus Release Bot"
+            git config user.email "$AUR_COMMIT_EMAIL"
+            if git diff --quiet; then
+              echo "$package is already up to date."
+              continue
+            fi
+            git add PKGBUILD .SRCINFO
+            git commit -m "Update $package to $VERSION"
+            git push origin master
+          done
