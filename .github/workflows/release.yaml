@@ -63,19 +63,23 @@ jobs:
 
       - name: Build precompiled Arch package
         shell: bash
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
         run: |
           set -euo pipefail
+          RELEASE_SHA="$(git rev-parse HEAD)"
+          sed -i -E "s|(hyprland-plus::git\\+https://github.com/trail-b1az3r/hyprland-plus.git#commit=)[0-9a-f]+|\\1$RELEASE_SHA|" packaging/aur/PKGBUILD
+          grep -q "commit=$RELEASE_SHA" packaging/aur/PKGBUILD
           mkdir -p "$RUNNER_TEMP/arch-packages"
           docker run --rm \
             -v "$GITHUB_WORKSPACE:/src" \
             -v "$RUNNER_TEMP/arch-packages:/out" \
-            -w /src \
             archlinux:base-devel bash -euc '
               pacman -Syu --noconfirm
               useradd -m builder
               chown -R builder:builder /src /out
-              su builder -c "makepkg --syncdeps --noconfirm --cleanbuild"
-              cp /src/*.pkg.tar.zst /out/
+              su builder -c "cd /src/packaging/aur && makepkg --syncdeps --noconfirm --cleanbuild"
+              cp /src/packaging/aur/*.pkg.tar.zst /out/
             '
           PACKAGE="$(find "$RUNNER_TEMP/arch-packages" -maxdepth 1 -name 'hyprland-plus-*.pkg.tar.zst' -print -quit)"
           test -n "$PACKAGE"
