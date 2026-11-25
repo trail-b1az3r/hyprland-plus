@@ -20,7 +20,7 @@ jobs:
   cleanup:
     # Do not start another cleanup run in response to this workflow completing.
     if: github.event_name != 'workflow_run' || github.event.workflow.name != 'Cleanup old workflow runs'
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - name: Cancel runs older than the newest two for each workflow
         uses: actions/github-script@v7
